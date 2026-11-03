@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>สภานักเรียน โรงเรียนวังจันทร์วิทยา</title>
+  <meta name="description" content="เว็บไซต์คณะกรรมการสภานักเรียน โรงเรียนวังจันทร์วิทยา — บัญชีสภาโปร่งใส ตรวจสอบได้ทุกคน">
+  <link rel="icon" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=6">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a href="#home" class="brand">
+        <img src="assets/logo.png" alt="ตราคณะกรรมการสภานักเรียน โรงเรียนวังจันทร์วิทยา" width="48" height="48">
+        <span><b>สภานักเรียน</b><small>โรงเรียนวังจันทร์วิทยา</small></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="#home" data-route="home">หน้าแรก</a>
+        <a href="#calendar" data-route="calendar">ปฏิทินงาน</a>
+        <a href="#finance" data-route="finance">บัญชีสภา</a>
+        <a href="#duty" data-route="duty">เช็คชื่อปฏิบัติงาน</a>
+        <a href="#members" data-route="members" class="admin-only" hidden>ผู้ใช้และสิทธิ์</a>
+      </nav>
+      <div class="auth" id="authBox"></div>
+    </div>
+  </header>
+
+  <div class="demo-banner" id="demoBanner" hidden>
+    โหมดทดลอง — ข้อมูลเก็บในเบราว์เซอร์นี้เท่านั้น · ผู้ดูแล <b>admin</b> / <b>admin1234</b> · ประธานนักเรียน <b>president</b> / <b>demo1234</b> · หัวหน้าเช็คชื่อ <b>leader</b> / <b>demo1234</b> · เหรัญญิก <b>treasurer</b> / <b>demo1234</b>
+  </div>
+
+  <main>
+    <!-- หน้าแรก -->
+    <section class="page" id="page-home">
+      <div class="hero">
+        <div class="wrap hero-in">
+          <div class="hero-text">
+            <p class="eyebrow">ปีการศึกษา <span data-year></span></p>
+            <h1>คณะกรรมการ<br>สภานักเรียน</h1>
+            <p class="lead">โรงเรียนวังจันทร์วิทยา — ทำงานเพื่อนักเรียน โปร่งใส ตรวจสอบได้</p>
+            <div class="hero-actions">
+              <a href="#finance" class="btn btn-gold">ดูบัญชีสภา</a>
+            </div>
+            <div class="hero-balance">
+              <span>ยอดเงินคงเหลือปัจจุบัน</span>
+              <strong id="heroBalance">—</strong>
+            </div>
+          </div>
+          <div class="hero-logo">
+            <img src="assets/logo.png" alt="" width="360" height="360">
+          </div>
+        </div>
+      </div>
+
+      <section class="wrap cal-section" id="calSection" aria-labelledby="calTitle">
+        <div class="cal-title-row">
+          <h2 class="section-title" id="calTitle">ปฏิทินการปฏิบัติงาน</h2>
+          <button class="btn btn-gold cal-only" id="btnAddEvent" hidden>+ เพิ่มงานในปฏิทิน</button>
+        </div>
+        <div id="calendarBox"><p class="empty">กำลังโหลดปฏิทิน…</p></div>
+      </section>
+
+      <div class="wrap">
+        <h2 class="section-title">บริการของสภานักเรียน</h2>
+        <div class="features">
+          <a class="feature active" href="#finance">
+            <span class="f-icon">฿</span>
+            <h3>บัญชีสภา</h3>
+            <p>รายรับ–รายจ่ายของสภา เปิดให้ทุกคนตรวจสอบได้ พร้อมชื่อผู้บันทึกทุกรายการ</p>
+            <span class="tag tag-live">เปิดใช้งาน</span>
+          </a>
+          <a class="feature active" href="#duty">
+            <span class="f-icon">✓</span>
+            <h3>เช็คชื่อปฏิบัติงาน</h3>
+            <p>กำหนดงาน วัน เวลา และสมาชิก หัวหน้าเช็คชื่อรายวันหรือเช็ครวม พร้อมสรุปผลทุกคน</p>
+            <span class="tag tag-live">เปิดใช้งาน</span>
+          </a>
+          <div class="feature"><span class="f-icon">📣</span><h3>ข่าวประชาสัมพันธ์</h3><p>ประกาศและข่าวสารกิจกรรมของสภานักเรียน</p><span class="tag">เร็ว ๆ นี้</span></div>
+          <a class="feature active" href="#calendar"><span class="f-icon">📅</span><h3>ปฏิทินการปฏิบัติงาน</h3><p>กำหนดการประชุม กิจกรรม และเวรปฏิบัติงาน บันทึกโดยประธานนักเรียนและครู</p><span class="tag tag-live">เปิดใช้งาน</span></a>
+          <div class="feature"><span class="f-icon">💬</span><h3>รับฟังความคิดเห็น</h3><p>ส่งข้อเสนอแนะและเรื่องร้องเรียนถึงสภา</p><span class="tag">เร็ว ๆ นี้</span></div>
+          <div class="feature"><span class="f-icon">🗳️</span><h3>โหวต / สำรวจ</h3><p>ลงคะแนนและสำรวจความเห็นนักเรียน</p><span class="tag">เร็ว ๆ นี้</span></div>
+          <div class="feature"><span class="f-icon">👥</span><h3>ทำเนียบกรรมการ</h3><p>รายชื่อคณะกรรมการสภานักเรียนประจำปี</p><span class="tag">เร็ว ๆ นี้</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- บัญชีสภา -->
+    <section class="page" id="page-finance" hidden>
+      <div class="page-head">
+        <div class="wrap page-head-in">
+          <div>
+            <p class="eyebrow">ความโปร่งใส ตรวจสอบได้</p>
+            <h1>บัญชีสภานักเรียน</h1>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-in recorder-only" data-new="in" hidden>+ บันทึกรายรับ</button>
+            <button class="btn btn-out recorder-only" data-new="out" hidden>− บันทึกรายจ่าย/ถอนเงิน</button>
+            <button class="btn btn-ghost guest-only" id="loginCta">เข้าสู่ระบบเพื่อบันทึก</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <div class="stats">
+          <div class="stat stat-balance"><span>ยอดคงเหลือ</span><strong id="sBalance">—</strong></div>
+          <div class="stat"><span>รายรับรวม</span><strong class="c-in" id="sIn">—</strong></div>
+          <div class="stat"><span>รายจ่ายรวม</span><strong class="c-out" id="sOut">—</strong></div>
+          <div class="stat"><span>จำนวนรายการ</span><strong id="sCount">—</strong></div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-head"><h2>รายรับ–รายจ่ายรายเดือน</h2>
+            <div class="legend"><span><i class="dot dot-in"></i>รายรับ</span><span><i class="dot dot-out"></i>รายจ่าย</span></div>
+          </div>
+          <div id="chart" class="chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar">
+            <input type="search" id="fSearch" placeholder="ค้นหา รายการ / ผู้บันทึก / เลขที่" aria-label="ค้นหา">
+            <select id="fType" aria-label="ประเภท">
+              <option value="">ทุกประเภท</option>
+              <option value="in">รายรับ</option>
+              <option value="out">รายจ่าย</option>
+            </select>
+            <select id="fMonth" aria-label="เดือน"><option value="">ทุกเดือน</option></select>
+            <label class="chk"><input type="checkbox" id="fVoid"> แสดงรายการที่ยกเลิก</label>
+            <span class="spacer"></span>
+            <button class="btn btn-ghost btn-sm" id="btnCsv">ดาวน์โหลด CSV</button>
+            <button class="btn btn-ghost btn-sm" id="btnPrint">พิมพ์</button>
+          </div>
+          <div class="table-wrap">
+            <table class="ledger tx">
+              <thead>
+                <tr><th>วันที่</th><th>เลขที่</th><th>รายการ / ที่มา</th><th class="num">รายรับ</th><th class="num">รายจ่าย</th><th class="num">คงเหลือ</th><th>ผู้บันทึก</th></tr>
+              </thead>
+              <tbody id="ledgerBody"></tbody>
+            </table>
+          </div>
+          <p class="empty" id="ledgerEmpty" hidden>ยังไม่มีรายการ</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- เช็คชื่อปฏิบัติงาน -->
+    <section class="page" id="page-duty" hidden>
+      <div class="page-head">
+        <div class="wrap page-head-in">
+          <div><p class="eyebrow">ความรับผิดชอบ ตรงต่อเวลา</p><h1>เช็คชื่อปฏิบัติงาน</h1></div>
+          <div class="head-actions">
+            <a class="btn btn-ghost" href="#duty/roster">รายชื่อสมาชิก</a>
+            <button class="btn btn-gold check-only" id="btnNewDuty" hidden>+ สร้างงาน</button>
+          </div>
+        </div>
+      </div>
+      <div class="wrap" id="dutyView"></div>
+    </section>
+
+    <!-- จัดการสมาชิก -->
+    <section class="page" id="page-members" hidden>
+      <div class="page-head">
+        <div class="wrap page-head-in">
+          <div><p class="eyebrow">สำหรับผู้ดูแลระบบ</p><h1>จัดการผู้ใช้และสิทธิ์</h1></div>
+          <div class="head-actions"><button class="btn btn-gold" id="btnAddUser">+ เพิ่มสมาชิก</button></div>
+        </div>
+      </div>
+      <div class="wrap">
+        <div class="card">
+          <p class="hint">ผู้ใช้แต่ละคนมีชื่อผู้ใช้และรหัสผ่านของตัวเอง ทุกรายการที่บันทึกจะแสดงชื่อผู้บันทึกโดยอัตโนมัติ · สิทธิ์ "หัวหน้าเช็คชื่อ" ใช้สร้างงานและเช็คชื่อสมาชิก</p>
+          <div class="table-wrap">
+            <table class="ledger">
+              <thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>ตำแหน่ง</th><th>สิทธิ์</th><th>สถานะ</th><th></th></tr></thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-in">
+      <img src="assets/logo.png" alt="" width="56" height="56">
+      <div><b>คณะกรรมการสภานักเรียน</b><br>โรงเรียนวังจันทร์วิทยา</div>
+    </div>
+  </footer>
+
+  <dialog id="dlg" class="dlg"><div id="dlgBody"></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="config.js?v=1"></script>
+  <script src="app.js?v=4"></script>
+  <script src="duty.js?v=3"></script>
+  <script src="calendar.js?v=1"></script>
+</body>
+</html>
