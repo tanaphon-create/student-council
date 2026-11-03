@@ -109,13 +109,48 @@ img { max-width: 100%; display: block; }
 .hero-balance span { font-size: 14px; color: var(--gold-300); }
 .hero-balance strong { font: 600 30px 'Prompt'; font-variant-numeric: tabular-nums; }
 .hero-logo { display: flex; justify-content: center; }
-.hero-logo img {
-  width: min(360px, 80%); height: auto;
-  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, .35));
+.logo-fx {
+  position: relative; width: min(360px, 80%);
   animation: float 6s ease-in-out infinite;
 }
+.logo-fx img {
+  display: block; width: 100%; height: auto; position: relative;
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, .35));
+}
+/* golden halo that breathes behind the seal */
+.logo-fx::before {
+  content: ""; position: absolute; inset: -12%; border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 214, 117, .45), rgba(242, 214, 117, .12) 45%, transparent 68%);
+  animation: halo 4s ease-in-out infinite;
+}
+/* light sweep across the seal, clipped to the logo's own shape */
+.logo-fx::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .0) 42%, rgba(255, 250, 225, .75) 50%, rgba(255, 255, 255, 0) 58%, transparent 62%) no-repeat;
+  background-size: 250% 100%; background-position: 150% 0;
+  -webkit-mask: url(assets/logo.png) center / contain no-repeat;
+          mask: url(assets/logo.png) center / contain no-repeat;
+  mix-blend-mode: screen;
+  animation: sweep 5s ease-in-out 1s infinite;
+}
+.spark {
+  position: absolute; width: 22px; height: 22px; opacity: 0;
+  background: radial-gradient(circle, #fff 0 12%, transparent 13%),
+    conic-gradient(from 45deg, transparent 0 22%, #fff7d6 25%, transparent 28% 47%, #fff7d6 50%, transparent 53% 72%, #fff7d6 75%, transparent 78% 97%, #fff7d6 100%);
+  -webkit-mask: radial-gradient(circle, #000 0 30%, transparent 70%);
+          mask: radial-gradient(circle, #000 0 30%, transparent 70%);
+  filter: drop-shadow(0 0 6px rgba(255, 236, 160, .9));
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+.s1 { top: 6%;  left: 14%; }
+.s2 { top: 18%; right: 4%;  width: 16px; height: 16px; animation-delay: .9s; }
+.s3 { bottom: 12%; left: 4%; width: 14px; height: 14px; animation-delay: 1.7s; }
+.s4 { bottom: 4%; right: 18%; animation-delay: 2.4s; }
 @keyframes float { 50% { transform: translateY(-10px); } }
-@media (prefers-reduced-motion: reduce) { .hero-logo img { animation: none; } }
+@keyframes halo { 50% { transform: scale(1.06); opacity: .65; } }
+@keyframes sweep { 0% { background-position: 150% 0; } 45%, 100% { background-position: -50% 0; } }
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+@media (prefers-reduced-motion: reduce) { .logo-fx, .logo-fx::before, .logo-fx::after, .spark { animation: none; } .spark { display: none; } }
 
 .section-title { font-size: 26px; margin: 44px 0 18px; color: var(--green-800); }
 .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; margin-bottom: 56px; }
@@ -455,7 +490,7 @@ textarea { resize: vertical; min-height: 90px; }
   .nav { order: 3; width: 100%; overflow-x: auto; }
   .hero-in { grid-template-columns: 1fr; text-align: center; padding: 36px 0 48px; }
   .hero-logo { order: -1; }
-  .hero-logo img { width: 200px; }
+  .logo-fx { width: 200px; }
   .lead { margin-inline: auto; }
   .hero-actions { justify-content: center; }
   .stats { grid-template-columns: repeat(3, 1fr); }
