@@ -12,6 +12,10 @@ const ADMIN_USERNAME = 'admin';
 const ADMIN_NAME = 'ผู้ดูแลระบบ';
 const ADMIN_INITIAL_PASSWORD = 'ChangeMe-2569'; // แก้ก่อนรัน setup และเปลี่ยนอีกครั้งบนหน้าเว็บ
 
+// ID ของ Google Sheet ที่เก็บข้อมูล (เว้นว่างถ้าสคริปต์ผูกกับชีตอยู่แล้ว)
+const SPREADSHEET_ID = '';
+const ss_ = () => SPREADSHEET_ID ? SpreadsheetApp.openById(SPREADSHEET_ID) : SpreadsheetApp.getActive();
+
 const SHEET_TX = 'Transactions';
 const SHEET_USERS = 'Users';
 const SESSION_SECONDS = 6 * 60 * 60;
@@ -43,7 +47,7 @@ function setup() {
   if (ADMIN_INITIAL_PASSWORD === 'ChangeMe-2569' || ADMIN_INITIAL_PASSWORD.length < 8) {
     throw new Error('กรุณาแก้ ADMIN_INITIAL_PASSWORD เป็นรหัสของคุณเอง (อย่างน้อย 8 ตัว) ก่อนรัน setup');
   }
-  const ss = SpreadsheetApp.getActive();
+  const ss = ss_();
   const ensure = (name, headers, plainText) => {
     const s = ss.getSheetByName(name) || ss.insertSheet(name);
     if (plainText) s.getRange('A:Z').setNumberFormat('@'); // กันชีตแปลงวันที่/เวลาเป็นรูปแบบอื่น
@@ -312,7 +316,7 @@ function clean_(v, max) {
 }
 
 function sheet_(name) {
-  const s = SpreadsheetApp.getActive().getSheetByName(name);
+  const s = ss_().getSheetByName(name);
   if (!s) throw new Error('ยังไม่ได้รัน setup');
   return s;
 }
