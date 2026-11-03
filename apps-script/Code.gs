@@ -554,3 +554,17 @@ function deleteEvent_(b) {
   sheet_(SHEET_EVENTS).getRange(row, EVENT_HEADERS.indexOf('status') + 1).setValue('deleted');
   return true;
 }
+
+/* ---------- กู้รหัสผู้ดูแล ---------- */
+// ลืมรหัส admin: แก้ ADMIN_INITIAL_PASSWORD ด้านบน บันทึก แล้วรันฟังก์ชันนี้ (ปลดล็อกการใส่รหัสผิดด้วย)
+function resetAdminPassword() {
+  if (ADMIN_INITIAL_PASSWORD === 'ChangeMe-2569' || ADMIN_INITIAL_PASSWORD.length < 8) {
+    throw new Error('กรุณาแก้ ADMIN_INITIAL_PASSWORD เป็นรหัสของคุณเอง (อย่างน้อย 8 ตัว) ก่อน');
+  }
+  const found = findUser_(ADMIN_USERNAME);
+  if (!found) throw new Error('ไม่พบผู้ใช้ ' + ADMIN_USERNAME + ' กรุณารัน setup');
+  setPassword_(found.row, ADMIN_INITIAL_PASSWORD);
+  sheet_(SHEET_USERS).getRange(found.row, USER_HEADERS.indexOf('active') + 1).setValue(true);
+  CacheService.getScriptCache().remove('fail_' + ADMIN_USERNAME);
+  Logger.log('ตั้งรหัสผ่านของ ' + ADMIN_USERNAME + ' ใหม่เรียบร้อย');
+}
