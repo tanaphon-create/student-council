@@ -743,6 +743,45 @@ code { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; background
 .pt-card b { font: 600 18px 'Prompt'; }
 .pt-card span { color: #7a5a00; font-weight: 600; font-size: 15px; }
 
+/* ---------- INTRO ---------- */
+html.intro-on, html.intro-on body { overflow: hidden; }
+.intro {
+  position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; overflow: hidden; cursor: pointer;
+  color: #fff; text-align: center;
+  background: radial-gradient(circle at 50% 42%, #1c8a4c 0%, var(--green-800) 45%, var(--green-900) 100%);
+  transition: opacity .6s ease, transform .6s ease, visibility .6s;
+}
+.intro.out { opacity: 0; transform: scale(1.06); visibility: hidden; }
+.intro-glow { position: absolute; inset: -30%; background: conic-gradient(from 0deg, transparent, rgba(242, 214, 117, .13), transparent 25%, rgba(242, 214, 117, .08), transparent 55%, rgba(242, 214, 117, .1), transparent 80%); animation: introSpin 16s linear infinite; }
+.intro-center { position: relative; display: flex; flex-direction: column; align-items: center; padding: 0 20px; }
+.intro-logo { position: relative; width: min(220px, 54vw); aspect-ratio: 1; margin-bottom: 22px; animation: introPop 1s cubic-bezier(.2, 1.35, .4, 1) both; }
+.intro-logo img { position: relative; display: block; width: 100%; height: 100%; filter: drop-shadow(0 14px 40px rgba(0, 0, 0, .45)); }
+.intro-logo::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 250, 225, .85) 50%, transparent 62%) no-repeat;
+  background-size: 250% 100%; background-position: 150% 0;
+  -webkit-mask: url(assets/logo.png) center / contain no-repeat; mask: url(assets/logo.png) center / contain no-repeat;
+  mix-blend-mode: screen; animation: introSweep 1.3s ease-in-out .95s both;
+}
+.intro-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(242, 214, 117, .75); animation: introRing 1.8s ease-out .45s both; }
+.intro-ring.r2 { animation-delay: .9s; }
+.intro-t1 { font: 700 clamp(26px, 6vw, 46px)/1.25 'Prompt', sans-serif; text-shadow: 0 2px 14px rgba(0, 0, 0, .3); animation: introUp .7s ease-out 1s both; }
+.intro-bar { display: block; width: 0; height: 3px; margin: 14px 0 12px; background: linear-gradient(90deg, transparent, var(--gold-300), transparent); animation: introBar .8s ease-out 1.35s both; }
+.intro-t2 { margin: 0; color: var(--gold-300); font: 500 clamp(15px, 3.6vw, 20px) 'Prompt', sans-serif; animation: introUp .7s ease-out 1.55s both; }
+.intro-skip { position: absolute; right: 18px; bottom: 18px; padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .12); color: #fff; font: 500 14px 'Prompt', sans-serif; cursor: pointer; animation: introUp .4s ease-out .4s both; }
+.intro-skip:hover { background: rgba(255, 255, 255, .22); }
+@keyframes introPop { from { opacity: 0; transform: scale(.4) rotate(-14deg); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes introRing { from { opacity: .9; transform: scale(.92); } to { opacity: 0; transform: scale(1.9); } }
+@keyframes introUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes introBar { to { width: min(320px, 70vw); } }
+@keyframes introSweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@keyframes introSpin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  .intro *, .intro *::after { animation: none !important; }
+  .intro-bar { width: min(320px, 70vw); }
+  .intro-ring, .intro .spark { display: none; }
+}
+
 /* ---------- responsive ---------- */
 @media (max-width: 860px) {
   .topbar-in { flex-wrap: wrap; gap: 8px 12px; padding: 8px 0; }

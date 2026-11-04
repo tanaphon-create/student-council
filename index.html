@@ -9,9 +9,47 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
+  <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บในแต่ละครั้ง -->
+  <div id="intro" class="intro" role="presentation">
+    <div class="intro-glow"></div>
+    <div class="intro-center">
+      <div class="intro-logo">
+        <i class="intro-ring"></i><i class="intro-ring r2"></i>
+        <img src="assets/logo.png" alt="" width="220" height="220">
+        <i class="spark s1"></i><i class="spark s2"></i><i class="spark s3"></i><i class="spark s4"></i>
+      </div>
+      <h1 class="intro-t1">คณะกรรมการสภานักเรียน</h1>
+      <span class="intro-bar"></span>
+      <p class="intro-t2">โรงเรียนวังจันทร์วิทยา · ปีการศึกษา <span data-year>2569</span></p>
+    </div>
+    <button class="intro-skip" type="button">ข้าม ›</button>
+  </div>
+  <script>
+    (function () {
+      var el = document.getElementById('intro'), h = location.hash.replace('#', ''), seen = false;
+      try { seen = sessionStorage.getItem('sc_intro') === '1'; sessionStorage.setItem('sc_intro', '1'); } catch (e) { /* ไม่มี storage */ }
+      // ไม่ขึ้นซ้ำในการเปิดครั้งเดียวกัน และไม่ขึ้นเมื่อเปิดลิงก์ตรงไปหน้าอื่น (เช่น ลิงก์โหวตที่แชร์กัน)
+      if (seen || (h && h !== 'home')) { el.remove(); return; }
+      document.documentElement.classList.add('intro-on');
+      var done = false;
+      function close() {
+        if (done) return;
+        done = true;
+        el.classList.add('out');
+        setTimeout(function () {
+          el.remove();
+          document.documentElement.classList.remove('intro-on');
+          document.dispatchEvent(new Event('sc:intro-done'));
+        }, 650);
+      }
+      el.addEventListener('click', close);
+      setTimeout(close, matchMedia('(prefers-reduced-motion: reduce)').matches ? 1600 : 3200);
+    })();
+  </script>
+
   <header class="topbar">
     <div class="wrap topbar-in">
       <a href="#home" class="brand">
@@ -234,7 +272,7 @@
   <script src="config.js?v=2"></script>
   <script src="app.js?v=8"></script>
   <script src="duty.js?v=4"></script>
-  <script src="calendar.js?v=1"></script>
+  <script src="calendar.js?v=2"></script>
   <script src="vote.js?v=1"></script>
   <script src="feedback.js?v=1"></script>
   <script src="committee.js?v=5"></script>

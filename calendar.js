@@ -173,6 +173,8 @@
   /* ================= เด้งแจ้งเตือนเมื่อมีงาน ================= */
   // แสดงครั้งแรกที่เปิดหน้าแรกในแต่ละวัน (ต่อการเปิดเบราว์เซอร์หนึ่งครั้ง)
   function maybePopup() {
+    // รอให้ INTRO จบก่อน ไม่ให้หน้าต่างแจ้งเตือนเด้งทับ
+    if (document.getElementById('intro')) { document.addEventListener('sc:intro-done', maybePopup, { once: true }); return; }
     const t = today(), key = 'sc_cal_popup_' + t;
     try { if (sessionStorage.getItem(key)) return; } catch (_) { /* ไม่มี storage */ }
     if (SC.dialog.open || location.hash.replace('#', '') !== 'home' && location.hash !== '') return;
