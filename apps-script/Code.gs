@@ -26,6 +26,10 @@ const SHEET_MEMBERS = 'Members';
 const SHEET_DUTIES = 'Duties';
 const SHEET_ATT = 'Attendance';
 const SHEET_EVENTS = 'Events';
+const SHEET_POLLS = 'Polls';
+const SHEET_VOTES = 'Votes';
+const SHEET_VOTERS = 'Voters';
+const SHEET_CODES = 'VoteCodes';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
@@ -40,6 +44,16 @@ const ATT_STATUSES = ['present', 'late', 'leave', 'absent'];
 const EVENT_HEADERS = ['id', 'title', 'detail', 'date', 'endDate', 'timeStart', 'timeEnd', 'location', 'category',
   'status', 'createdByName', 'createdAt', 'updatedByName', 'updatedAt'];
 const EVENT_CATEGORIES = ['meeting', 'activity', 'work', 'special', 'other'];
+// voterMode: device = ทุกคน 1 ครั้งต่อเครื่อง, member = สมาชิกสภายืนยันด้วยเลขประจำตัว, code = รหัสโหวตใช้ครั้งเดียว
+// showResults: live = เห็นผลระหว่างโหวต, closed = เห็นผลเมื่อปิดโหวต · status: draft | open | closed | deleted
+const POLL_HEADERS = ['id', 'title', 'detail', 'options', 'maxChoices', 'voterMode', 'showResults', 'status', 'closeAt',
+  'createdByName', 'createdAt', 'updatedAt'];
+const POLL_MODES = ['device', 'member', 'code'];
+// ผลโหวต (Votes) กับรายชื่อผู้ที่โหวตแล้ว (Voters) แยกชีตกัน จึงไม่ผูกว่าใครเลือกอะไร
+const VOTE_HEADERS = ['pollId', 'choices', 'votedDate'];
+const VOTER_HEADERS = ['pollId', 'voterKey', 'votedAt'];
+const CODE_HEADERS = ['pollId', 'code', 'used', 'usedAt', 'createdAt'];
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 /* ---------- ติดตั้งครั้งแรก (รันซ้ำได้ ไม่ลบข้อมูลเดิม) ---------- */
 function setup() {
@@ -61,6 +75,10 @@ function setup() {
   ensure(SHEET_DUTIES, DUTY_HEADERS, true);
   ensure(SHEET_ATT, ATT_HEADERS, true);
   ensure(SHEET_EVENTS, EVENT_HEADERS, true);
+  ensure(SHEET_POLLS, POLL_HEADERS, true);
+  ensure(SHEET_VOTES, VOTE_HEADERS, true);
+  ensure(SHEET_VOTERS, VOTER_HEADERS, true);
+  ensure(SHEET_CODES, CODE_HEADERS, true);
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -76,6 +94,7 @@ function doGet(e) {
     if (action === 'list') return json_({ ok: true, data: listTransactions_() });
     if (action === 'duty') return json_({ ok: true, data: getDutyData_() });
     if (action === 'events') return json_({ ok: true, data: listEvents_() });
+    if (action === 'polls') return json_({ ok: true, data: listPolls_(false) });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -92,6 +111,8 @@ function doPost(e) {
       saveMember: saveMember_, bulkAddMembers: bulkAddMembers_, setMemberActive: setMemberActive_,
       saveDuty: saveDuty_, deleteDuty: deleteDuty_, saveAttendance: saveAttendance_,
       saveEvent: saveEvent_, deleteEvent: deleteEvent_,
+      vote: vote_, adminPolls: adminPolls_, savePoll: savePoll_, setPollStatus: setPollStatus_, deletePoll: deletePoll_,
+      genVoteCodes: genVoteCodes_, listVoteCodes: listVoteCodes_,
     };
     const fn = handlers[body.action];
     if (!fn) throw new Error('ไม่รู้จักคำสั่ง');
@@ -553,6 +574,195 @@ function deleteEvent_(b) {
   const row = findRow_(SHEET_EVENTS, b.id);
   sheet_(SHEET_EVENTS).getRange(row, EVENT_HEADERS.indexOf('status') + 1).setValue('deleted');
   return true;
+}
+
+/* ---------- โหวต / สำรวจความเห็น ---------- */
+const nowLocal_ = () => Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm");
+
+function pollOut_(p) {
+  let options = [];
+  try { options = JSON.parse(str_(p.options) || '[]'); } catch (_) { /* ข้อมูลเสีย */ }
+  let status = str_(p.status) || 'draft';
+  const closeAt = str_(p.closeAt);
+  if (status === 'open' && closeAt && nowLocal_() >= closeAt) status = 'closed'; // ปิดอัตโนมัติเมื่อถึงเวลา
+  return {
+    id: str_(p.id), title: str_(p.title), detail: str_(p.detail), options, maxChoices: Number(p.maxChoices) || 1,
+    voterMode: POLL_MODES.indexOf(str_(p.voterMode)) >= 0 ? str_(p.voterMode) : 'device',
+    showResults: str_(p.showResults) === 'closed' ? 'closed' : 'live', status, closeAt,
+    createdByName: str_(p.createdByName), createdAt: str_(p.createdAt),
+  };
+}
+
+// admin = true คืนทุกโพลพร้อมผลเสมอ, false = เฉพาะโพลที่เปิด/ปิดแล้ว และซ่อนผลตามที่ตั้งไว้
+function listPolls_(admin) {
+  const polls = readRows_(SHEET_POLLS, POLL_HEADERS).map(pollOut_)
+    .filter(p => p.status !== 'deleted' && (admin || p.status !== 'draft'));
+  const counts = {}, voters = {};
+  readRows_(SHEET_VOTES, VOTE_HEADERS).forEach(v => {
+    const id = str_(v.pollId);
+    counts[id] = counts[id] || {};
+    voters[id] = (voters[id] || 0) + 1;
+    str_(v.choices).split(',').filter(x => x !== '').forEach(i => { counts[id][i] = (counts[id][i] || 0) + 1; });
+  });
+  let codes = {};
+  if (admin) {
+    readRows_(SHEET_CODES, CODE_HEADERS).forEach(c => {
+      const id = str_(c.pollId);
+      codes[id] = codes[id] || { total: 0, used: 0 };
+      codes[id].total++;
+      if (str_(c.used) === 'true') codes[id].used++;
+    });
+  }
+  return polls.map(p => {
+    const visible = admin || p.showResults === 'live' || p.status === 'closed';
+    const c = counts[p.id] || {};
+    return Object.assign(p, {
+      voters: voters[p.id] || 0,
+      counts: visible ? p.options.map((_, i) => c[i] || 0) : null,
+      codes: admin ? (codes[p.id] || { total: 0, used: 0 }) : undefined,
+    });
+  });
+}
+
+function adminPolls_(b) {
+  requireSession_(b.token, 'admin');
+  return listPolls_(true);
+}
+
+function findPoll_(id) {
+  const p = readRows_(SHEET_POLLS, POLL_HEADERS).map(pollOut_).filter(x => x.id === String(id) && x.status !== 'deleted')[0];
+  if (!p) throw new Error('ไม่พบโพลนี้');
+  return p;
+}
+
+function vote_(b) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const poll = findPoll_(b.pollId);
+    if (poll.status !== 'open') throw new Error(poll.status === 'closed' ? 'โพลนี้ปิดโหวตแล้ว' : 'โพลนี้ยังไม่เปิดโหวต');
+    const picks = (Array.isArray(b.choices) ? b.choices : []).map(Number);
+    if (!picks.length) throw new Error('กรุณาเลือกอย่างน้อย 1 ตัวเลือก');
+    if (picks.length > poll.maxChoices) throw new Error('เลือกได้ไม่เกิน ' + poll.maxChoices + ' ตัวเลือก');
+    if (picks.some(i => !(i >= 0 && i < poll.options.length && Math.floor(i) === i)) || new Set(picks).size !== picks.length) {
+      throw new Error('ตัวเลือกไม่ถูกต้อง');
+    }
+
+    let key, codeRow = 0;
+    if (poll.voterMode === 'member') {
+      const sid = String(b.studentId || '').trim();
+      const m = sid && readRows_(SHEET_MEMBERS, MEMBER_HEADERS).filter(x => str_(x.studentId) === sid && str_(x.active) !== 'false')[0];
+      if (!m) throw new Error('ไม่พบเลขประจำตัวนี้ในรายชื่อสมาชิกสภานักเรียน');
+      key = 'm:' + str_(m.id);
+    } else if (poll.voterMode === 'code') {
+      const code = String(b.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const rows = readRows_(SHEET_CODES, CODE_HEADERS);
+      const i = rows.findIndex(c => str_(c.pollId) === poll.id && str_(c.code) === code);
+      if (!code || i < 0) throw new Error('รหัสโหวตไม่ถูกต้อง');
+      if (str_(rows[i].used) === 'true') throw new Error('รหัสนี้ถูกใช้โหวตไปแล้ว');
+      key = 'c:' + code;
+      codeRow = i + 2;
+    } else {
+      const dev = String(b.deviceId || '');
+      if (!/^[A-Za-z0-9-]{8,64}$/.test(dev)) throw new Error('ไม่สามารถระบุเครื่องได้ กรุณาเปิดหน้าเว็บใหม่');
+      key = 'd:' + dev;
+    }
+    const done = readRows_(SHEET_VOTERS, VOTER_HEADERS).some(v => str_(v.pollId) === poll.id && str_(v.voterKey) === key);
+    if (done) throw new Error(poll.voterMode === 'member' ? 'เลขประจำตัวนี้โหวตไปแล้ว' : 'โหวตไปแล้ว โหวตซ้ำไม่ได้');
+
+    const now = new Date().toISOString();
+    if (codeRow) sheet_(SHEET_CODES).getRange(codeRow, CODE_HEADERS.indexOf('used') + 1, 1, 2).setValues([['true', now]]);
+    sheet_(SHEET_VOTERS).appendRow([poll.id, key, now]);
+    sheet_(SHEET_VOTES).appendRow([poll.id, picks.sort((x, y) => x - y).join(','), now.slice(0, 10)]);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function savePoll_(b) {
+  const user = requireSession_(b.token, 'admin');
+  const title = clean_(b.title, 200);
+  if (!title) throw new Error('กรุณาระบุหัวข้อโหวต');
+  const closeAt = String(b.closeAt || '');
+  if (closeAt && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(closeAt)) throw new Error('เวลาปิดโหวตไม่ถูกต้อง');
+  const now = new Date().toISOString();
+  const values = { title, detail: clean_(b.detail, 2000), closeAt, showResults: b.showResults === 'closed' ? 'closed' : 'live', updatedAt: now };
+  const shape = () => {
+    const options = (Array.isArray(b.options) ? b.options : []).map(o => clean_(o, 200)).filter(o => o);
+    if (options.length < 2) throw new Error('ต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก');
+    if (options.length > 30) throw new Error('ตัวเลือกได้ไม่เกิน 30 ตัวเลือก');
+    if (new Set(options).size !== options.length) throw new Error('มีตัวเลือกซ้ำกัน');
+    const maxChoices = Math.min(Math.max(Math.floor(Number(b.maxChoices) || 1), 1), options.length);
+    return { options: JSON.stringify(options), maxChoices, voterMode: POLL_MODES.indexOf(b.voterMode) >= 0 ? b.voterMode : 'device' };
+  };
+  const sheet = sheet_(SHEET_POLLS);
+  if (b.id) {
+    const row = findRow_(SHEET_POLLS, b.id);
+    const hasVotes = readRows_(SHEET_VOTERS, VOTER_HEADERS).some(v => str_(v.pollId) === String(b.id));
+    if (!hasVotes) Object.assign(values, shape()); // มีคนโหวตแล้วแก้ตัวเลือกไม่ได้
+    const cur = sheet.getRange(row, 1, 1, POLL_HEADERS.length).getValues()[0];
+    sheet.getRange(row, 1, 1, POLL_HEADERS.length).setValues([POLL_HEADERS.map((h, i) => h in values ? values[h] : cur[i])]);
+    return { id: b.id, locked: hasVotes };
+  }
+  const id = Utilities.getUuid();
+  Object.assign(values, shape(), { id, status: b.open ? 'open' : 'draft', createdByName: user.name, createdAt: now });
+  sheet.appendRow(POLL_HEADERS.map(h => values[h]));
+  return { id };
+}
+
+function setPollStatus_(b) {
+  requireSession_(b.token, 'admin');
+  const status = b.status === 'open' ? 'open' : 'closed';
+  const row = findRow_(SHEET_POLLS, b.id);
+  const sheet = sheet_(SHEET_POLLS);
+  sheet.getRange(row, POLL_HEADERS.indexOf('status') + 1).setValue(status);
+  // เปิดใหม่หลังเลยเวลาปิด = ยกเลิกเวลาปิดอัตโนมัติเดิม
+  const closeCol = POLL_HEADERS.indexOf('closeAt') + 1;
+  if (status === 'open' && str_(sheet.getRange(row, closeCol).getValue()) && nowLocal_() >= str_(sheet.getRange(row, closeCol).getValue())) {
+    sheet.getRange(row, closeCol).setValue('');
+  }
+  return true;
+}
+
+function deletePoll_(b) {
+  requireSession_(b.token, 'admin');
+  const row = findRow_(SHEET_POLLS, b.id);
+  sheet_(SHEET_POLLS).getRange(row, POLL_HEADERS.indexOf('status') + 1).setValue('deleted');
+  return true;
+}
+
+function genVoteCodes_(b) {
+  requireSession_(b.token, 'admin');
+  const poll = findPoll_(b.pollId);
+  if (poll.voterMode !== 'code') throw new Error('โพลนี้ไม่ได้ใช้รหัสโหวต');
+  const n = Math.floor(Number(b.count));
+  if (!(n >= 1 && n <= 1000)) throw new Error('สร้างได้ครั้งละ 1–1000 รหัส');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const taken = {};
+    readRows_(SHEET_CODES, CODE_HEADERS).forEach(c => { if (str_(c.pollId) === poll.id) taken[str_(c.code)] = true; });
+    const now = new Date().toISOString(), rows = [];
+    while (rows.length < n) {
+      let code = '';
+      for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+      if (taken[code]) continue;
+      taken[code] = true;
+      rows.push([poll.id, code, 'false', '', now]);
+    }
+    const sheet = sheet_(SHEET_CODES);
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, CODE_HEADERS.length).setValues(rows);
+    return { added: rows.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function listVoteCodes_(b) {
+  requireSession_(b.token, 'admin');
+  return readRows_(SHEET_CODES, CODE_HEADERS).filter(c => str_(c.pollId) === String(b.pollId))
+    .map(c => ({ code: str_(c.code), used: str_(c.used) === 'true' }));
 }
 
 /* ---------- กู้รหัสผู้ดูแล ---------- */

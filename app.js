@@ -552,13 +552,14 @@
   /* ================= router ================= */
   function route() {
     let [r, param] = (location.hash || '#home').slice(1).split('/');
-    if (!['home', 'calendar', 'finance', 'members', 'duty'].includes(r)) r = 'home';
+    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote'].includes(r)) r = 'home';
     if (r === 'members' && !isAdmin()) r = 'finance';
     const page = r === 'calendar' ? 'home' : r; // ปฏิทินอยู่ในหน้าแรก
     $$('.page').forEach(p => (p.hidden = p.id !== 'page-' + page));
     $$('#nav a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
     if (r === 'members') loadUsers();
     if (r === 'duty') document.dispatchEvent(new CustomEvent('sc:duty', { detail: param || '' }));
+    if (r === 'vote') document.dispatchEvent(new CustomEvent('sc:vote', { detail: param || '' }));
     window.scrollTo(0, 0);
     if (page === 'home') document.dispatchEvent(new CustomEvent('sc:home', { detail: { scroll: r === 'calendar' } }));
   }
