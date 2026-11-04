@@ -4,7 +4,7 @@
   const SC = window.SC;
   const { $, $$, esc, can, toast, openDialog, dlgHead } = SC;
 
-  const cs = { members: null, photos: {}, q: '' };
+  const cs = { members: null, photos: {}, q: '', mode: 'list' };
   const PREFIX = /^(นางสาว|นาย|นาง|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)\s*/;
   // ตำแหน่งบริหารเรียงตามลำดับนี้ ตำแหน่งอื่นจัดกลุ่มตาม "ฝ่าย..."
   const EXEC = [/^ประธาน/, /^รองประธาน/, /^เลขานุการ/, /^ผู้ช่วยเลขานุการ/, /^เหรัญญิก/, /^ผู้ช่วยเหรัญญิก/, /^ปฏิคม/, /^ประชาสัมพันธ์/, /^นายทะเบียน/];
@@ -15,8 +15,11 @@
   // ตัวอักษรย่อ: พยัญชนะตัวแรกของชื่อ (ข้ามสระหน้า เ แ โ ใ ไ)
   const initial = (name) => (String(name).replace(PREFIX, '').trim().replace(/^[เแโใไ]/, '')[0] || '?');
   const sideOf = (p) => { const m = p.match(/ฝ่าย\s*\S+/); return m ? m[0].replace(/\s/g, '') : ''; };
+  // หัวหน้าฝ่ายขึ้นก่อนในแต่ละฝ่าย
+  const head = (m) => /^(หัวหน้า|ประธาน)/.test(posOf(m)) ? 0 : /^รองหัวหน้า/.test(posOf(m)) ? 1 : 2;
 
-  document.addEventListener('sc:committee', async () => {
+  document.addEventListener('sc:committee', async (e) => {
+    cs.mode = e.detail === 'chart' ? 'chart' : 'list';
     if (cs.members) render(); else $('#committeeView').innerHTML = '<p class="empty">กำลังโหลดข้อมูล…</p>';
     try {
       const [duty, photos] = await Promise.all([SC.apiGet('duty'), SC.apiGet('photos').catch(() => ({}))]);
@@ -39,8 +42,6 @@
       const side = sideOf(p);
       if (side) (sides[side] = sides[side] || []).push(m); else others.push(m);
     });
-    // หัวหน้าฝ่ายขึ้นก่อนในแต่ละฝ่าย
-    const head = (m) => /^(หัวหน้า|ประธาน)/.test(posOf(m)) ? 0 : /^รองหัวหน้า/.test(posOf(m)) ? 1 : 2;
     Object.values(sides).forEach(a => a.sort((x, y) => head(x) - head(y) || byClass(x, y)));
     return {
       exec,
@@ -76,10 +77,15 @@
         <div class="stat"><span>จากห้องเรียน</span><strong>${classes} ห้อง</strong></div>
       </div>
       <div class="card cm-tools">
-        <input type="search" id="cmQ" placeholder="ค้นหาชื่อ ชั้น หรือตำแหน่ง" value="${esc(cs.q)}" aria-label="ค้นหากรรมการ">
+        <div class="seg" role="tablist" aria-label="รูปแบบการแสดง">
+          <a href="#committee" role="tab" aria-selected="${cs.mode === 'list'}" class="${cs.mode === 'list' ? 'on' : ''}">☰ รายชื่อ</a>
+          <a href="#committee/chart" role="tab" aria-selected="${cs.mode === 'chart'}" class="${cs.mode === 'chart' ? 'on' : ''}">⧉ ผังองค์กร</a>
+        </div>
+        ${cs.mode === 'list' ? `<input type="search" id="cmQ" placeholder="ค้นหาชื่อ ชั้น หรือตำแหน่ง" value="${esc(cs.q)}" aria-label="ค้นหากรรมการ">` : '<span class="spacer"></span>'}
         <button class="btn btn-ghost btn-sm" id="cmPrint">พิมพ์ทำเนียบ</button>
         ${can('attendance') ? '<a class="btn btn-ghost btn-sm" href="#duty/roster">แก้ไขรายชื่อ / ตำแหน่ง</a>' : ''}
       </div>
+      ${cs.mode === 'chart' ? chartHtml(groups(all)) : `
       ${!list.length ? '<div class="card"><p class="empty">ไม่พบรายชื่อ</p></div>' : ''}
       ${pres.length ? `<div class="cm-pres">${pres.map(m => card(m, true)).join('')}</div>` : ''}
       ${execRest.length ? sec('คณะกรรมการบริหาร', `<div class="cm-grid cm-exec">${execRest.map(m => card(m, true)).join('')}</div>`) : ''}
@@ -88,11 +94,52 @@
       ${g.plain.length ? sec(g.exec.length || g.sides.length || g.others.length ? 'กรรมการสภานักเรียน' : 'รายชื่อกรรมการสภานักเรียน',
         g.plain.map(([cls, ms]) => `<h3 class="cm-class">${esc(cls)} <small>${ms.length} คน</small></h3><div class="cm-grid cm-plain">${ms.sort(byClass).map(m => card(m)).join('')}</div>`).join(''),
         g.plain.reduce((n, [, ms]) => n + ms.length, 0)) : ''}
-      ${!g.exec.length && !s && can('attendance') ? '<p class="hint" style="text-align:center;margin-bottom:30px">ใส่ตำแหน่งในหน้า “รายชื่อสมาชิก” แล้วประธาน รองประธาน และฝ่ายต่าง ๆ จะแยกขึ้นด้านบนอัตโนมัติ</p>' : ''}`;
+      ${!g.exec.length && !s && can('attendance') ? '<p class="hint" style="text-align:center;margin-bottom:30px">ใส่ตำแหน่งในหน้า “รายชื่อสมาชิก” แล้วประธาน รองประธาน และฝ่ายต่าง ๆ จะแยกขึ้นด้านบนอัตโนมัติ</p>' : ''}`}`;
     const q = $('#cmQ');
-    q.oninput = () => { cs.q = q.value; const pos = q.selectionStart; render(); const n = $('#cmQ'); n.focus(); n.setSelectionRange(pos, pos); };
+    if (q) q.oninput = () => { cs.q = q.value; const pos = q.selectionStart; render(); const n = $('#cmQ'); n.focus(); n.setSelectionRange(pos, pos); };
     $('#cmPrint').onclick = () => window.print();
     $$('[data-photo]').forEach(b => (b.onclick = () => photoDialog(cs.members.find(m => m.id === b.dataset.photo))));
+    const wrap = $('.org-wrap');
+    if (wrap) wrap.scrollLeft = (wrap.scrollWidth - wrap.clientWidth) / 2; // ผังกว้างกว่าจอ: เริ่มที่กึ่งกลาง
+  }
+
+  /* ================= ผังองค์กร ================= */
+  const node = (m) => `<div class="org-node">${avatar(m)}<b>${esc(m.name)}</b><span class="cm-pos">${esc(posOf(m))}</span><small>${esc(m.classroom || '')}</small></div>`;
+  // แถวของตำแหน่งระดับเดียวกัน: up/down = มีเส้นเชื่อมระดับบน/ล่าง
+  const row = (ms, up, down) => `<div class="org-row ${ms.length > 1 ? 'multi' : ''} ${up ? 'up' : ''} ${down ? 'down' : ''}">
+    ${ms.map(m => `<div class="org-cell"><i class="ob" aria-hidden="true"></i>${node(m)}</div>`).join('')}</div>`;
+  const stem = '<div class="org-stem" aria-hidden="true"></div>';
+
+  function chartHtml(g) {
+    const flat = (p) => posOf(p).replace(/\s/g, '');
+    const pres = g.exec.filter(m => /^ประธาน/.test(flat(m)));
+    const vice = g.exec.filter(m => /^รองประธาน/.test(flat(m)));
+    const board = g.exec.filter(m => !pres.includes(m) && !vice.includes(m));
+    const depts = g.sides.concat(g.others.length ? [['ตำแหน่งอื่น ๆ', g.others]] : []);
+    const plain = g.plain.reduce((n, [, ms]) => n + ms.length, 0);
+    const levels = [pres, vice, board].filter(l => l.length);
+    const tail = depts.length || plain;
+    if (!levels.length && !depts.length) {
+      return `<div class="card"><p class="empty">ยังไม่มีตำแหน่ง จึงยังสร้างผังไม่ได้</p>
+        <p class="hint" style="text-align:center">ใส่ตำแหน่ง เช่น ประธานสภานักเรียน รองประธาน เลขานุการ หัวหน้าฝ่าย… ในหน้า “รายชื่อสมาชิก”</p></div>`;
+    }
+    const parts = levels.map((l, i) => row(l, i > 0, i < levels.length - 1 || !!tail));
+    let html = parts.join(stem);
+    if (depts.length) {
+      html += (levels.length ? stem : '') + `<div class="org-depts">
+        <div class="org-depts-title">ฝ่ายงาน <small>${depts.length} ฝ่าย</small></div>
+        <div class="org-dgrid">${depts.map(([name, ms]) => {
+          const heads = ms.filter(m => head(m) < 2), rest = ms.filter(m => head(m) === 2);
+          return `<div class="org-dept">
+            <h4>${esc(name)} <small>${ms.length} คน</small></h4>
+            ${heads.map(m => `<div class="org-head">${avatar(m)}<span><b>${esc(m.name)}</b><small>${esc(posOf(m))} · ${esc(m.classroom || '')}</small></span></div>`).join('')}
+            ${rest.length ? `<ul>${rest.map(m => `<li>${esc(m.name)} <small>${esc(m.classroom || '')}</small></li>`).join('')}</ul>` : ''}
+          </div>`;
+        }).join('')}</div>
+      </div>`;
+    }
+    if (plain) html += stem + `<div class="org-plain">สมาชิกสภานักเรียน <b>${plain}</b> คน · <a href="#committee">ดูรายชื่อทั้งหมด</a></div>`;
+    return `<div class="card org-card"><div class="org-wrap"><div class="org">${html}</div></div></div>`;
   }
 
   /* ================= รูปกรรมการ ================= */

@@ -562,7 +562,7 @@
     if (r === 'duty') document.dispatchEvent(new CustomEvent('sc:duty', { detail: param || '' }));
     if (r === 'vote') document.dispatchEvent(new CustomEvent('sc:vote', { detail: param || '' }));
     if (r === 'feedback') document.dispatchEvent(new CustomEvent('sc:feedback', { detail: param || '' }));
-    if (r === 'committee') document.dispatchEvent(new CustomEvent('sc:committee'));
+    if (r === 'committee') document.dispatchEvent(new CustomEvent('sc:committee', { detail: param || '' }));
     window.scrollTo(0, 0);
     if (page === 'home') document.dispatchEvent(new CustomEvent('sc:home', { detail: { scroll: r === 'calendar' } }));
   }
