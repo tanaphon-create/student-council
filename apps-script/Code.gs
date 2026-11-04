@@ -30,11 +30,12 @@ const SHEET_POLLS = 'Polls';
 const SHEET_VOTES = 'Votes';
 const SHEET_VOTERS = 'Voters';
 const SHEET_CODES = 'VoteCodes';
+const SHEET_FEEDBACK = 'Feedback';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
 // perms: สิทธิ์คั่นด้วยจุลภาค finance = บันทึกบัญชี, attendance = หัวหน้าเช็คชื่อ,
-// calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู) — admin ได้ทุกสิทธิ์
+// calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู), feedback = ตอบรับความคิดเห็น — admin ได้ทุกสิทธิ์
 const USER_HEADERS = ['username', 'name', 'position', 'role', 'salt', 'hash', 'active', 'createdAt', 'perms'];
 const MEMBER_HEADERS = ['id', 'name', 'classroom', 'position', 'active', 'createdAt', 'studentId'];
 const DUTY_HEADERS = ['id', 'title', 'detail', 'startDate', 'endDate', 'days', 'timeStart', 'timeEnd',
@@ -54,6 +55,12 @@ const VOTE_HEADERS = ['pollId', 'choices', 'votedDate'];
 const VOTER_HEADERS = ['pollId', 'voterKey', 'votedAt'];
 const CODE_HEADERS = ['pollId', 'code', 'used', 'usedAt', 'createdAt'];
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+// รับฟังความคิดเห็น: ชื่อ/ชั้น/ช่องทางติดต่อของผู้ส่ง เห็นเฉพาะผู้มีสิทธิ์ feedback ไม่แสดงสาธารณะ
+const FEEDBACK_HEADERS = ['id', 'code', 'category', 'subject', 'detail', 'name', 'classroom', 'contact', 'status',
+  'reply', 'repliedByName', 'repliedAt', 'public', 'createdAt', 'updatedAt'];
+const FEEDBACK_CATEGORIES = ['suggest', 'complain', 'praise', 'question', 'other'];
+const FEEDBACK_STATUSES = ['new', 'progress', 'done', 'rejected'];
+const FEEDBACK_PER_HOUR = 5;
 
 /* ---------- ติดตั้งครั้งแรก (รันซ้ำได้ ไม่ลบข้อมูลเดิม) ---------- */
 function setup() {
@@ -79,6 +86,7 @@ function setup() {
   ensure(SHEET_VOTES, VOTE_HEADERS, true);
   ensure(SHEET_VOTERS, VOTER_HEADERS, true);
   ensure(SHEET_CODES, CODE_HEADERS, true);
+  ensure(SHEET_FEEDBACK, FEEDBACK_HEADERS, true);
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -95,6 +103,7 @@ function doGet(e) {
     if (action === 'duty') return json_({ ok: true, data: getDutyData_() });
     if (action === 'events') return json_({ ok: true, data: listEvents_() });
     if (action === 'polls') return json_({ ok: true, data: listPolls_(false) });
+    if (action === 'feedback') return json_({ ok: true, data: publicFeedback_() });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -113,6 +122,7 @@ function doPost(e) {
       saveEvent: saveEvent_, deleteEvent: deleteEvent_,
       vote: vote_, adminPolls: adminPolls_, savePoll: savePoll_, setPollStatus: setPollStatus_, deletePoll: deletePoll_,
       genVoteCodes: genVoteCodes_, listVoteCodes: listVoteCodes_,
+      submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
     };
     const fn = handlers[body.action];
     if (!fn) throw new Error('ไม่รู้จักคำสั่ง');
@@ -293,7 +303,7 @@ function requireSession_(token, need) {
 
 // ผู้ใช้เก่าที่ยังไม่มีคอลัมน์ perms และเป็น member ถือว่าบันทึกบัญชีได้ตามเดิม
 function permsOf_(u) {
-  if (u.role === 'admin') return ['finance', 'attendance', 'calendar'];
+  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback'];
   const p = String(u.perms || '').trim();
   return p ? p.split(',').filter(x => x) : ['finance'];
 }
@@ -304,7 +314,7 @@ function hasPerm_(u, need) {
 }
 
 function cleanPerms_(perms) {
-  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar'].indexOf(p) >= 0);
+  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback'].indexOf(p) >= 0);
   return list.length ? list.join(',') : 'none';
 }
 
@@ -763,6 +773,98 @@ function listVoteCodes_(b) {
   requireSession_(b.token, 'admin');
   return readRows_(SHEET_CODES, CODE_HEADERS).filter(c => str_(c.pollId) === String(b.pollId))
     .map(c => ({ code: str_(c.code), used: str_(c.used) === 'true' }));
+}
+
+/* ---------- รับฟังความคิดเห็น ---------- */
+function feedbackOut_(f, full) {
+  const o = {
+    id: str_(f.id), category: FEEDBACK_CATEGORIES.indexOf(str_(f.category)) >= 0 ? str_(f.category) : 'other',
+    subject: str_(f.subject), detail: str_(f.detail), status: str_(f.status) || 'new', reply: str_(f.reply),
+    repliedAt: str_(f.repliedAt), createdAt: str_(f.createdAt), public: str_(f.public) === 'true',
+  };
+  if (full) {
+    Object.assign(o, { code: str_(f.code), name: str_(f.name), classroom: str_(f.classroom), contact: str_(f.contact),
+      repliedByName: str_(f.repliedByName), updatedAt: str_(f.updatedAt) });
+  }
+  return o;
+}
+
+// เรื่องที่ผู้มีสิทธิ์เลือกเผยแพร่ (ไม่มีข้อมูลผู้ส่ง) + สถิติรวมเพื่อความโปร่งใส
+function publicFeedback_() {
+  const rows = readRows_(SHEET_FEEDBACK, FEEDBACK_HEADERS);
+  const stats = { total: rows.length, new: 0, progress: 0, done: 0, rejected: 0 };
+  rows.forEach(f => { const st = str_(f.status) || 'new'; if (st in stats) stats[st]++; });
+  const items = rows.filter(f => str_(f.public) === 'true').map(f => feedbackOut_(f, false))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { stats, items };
+}
+
+function submitFeedback_(b) {
+  if (b.website) throw new Error('ส่งไม่สำเร็จ'); // ช่องดักบอต
+  const subject = clean_(b.subject, 150), detail = clean_(b.detail, 3000);
+  if (!subject) throw new Error('กรุณาระบุหัวข้อ');
+  if (detail.length < 5) throw new Error('กรุณาเขียนรายละเอียด');
+  const dev = String(b.deviceId || '');
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(dev)) throw new Error('ไม่สามารถระบุเครื่องได้ กรุณาเปิดหน้าเว็บใหม่');
+  const cache = CacheService.getScriptCache(), ck = 'fb_' + dev;
+  const sent = Number(cache.get(ck) || 0);
+  if (sent >= FEEDBACK_PER_HOUR) throw new Error('ส่งได้ไม่เกิน ' + FEEDBACK_PER_HOUR + ' เรื่องต่อชั่วโมง กรุณาลองใหม่ภายหลัง');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const taken = {};
+    readRows_(SHEET_FEEDBACK, FEEDBACK_HEADERS).forEach(f => { taken[str_(f.code)] = true; });
+    let code;
+    do {
+      code = 'FB-';
+      for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    } while (taken[code]);
+    const now = new Date().toISOString();
+    const v = {
+      id: Utilities.getUuid(), code, category: FEEDBACK_CATEGORIES.indexOf(b.category) >= 0 ? b.category : 'other',
+      subject, detail, name: clean_(b.name, 100), classroom: clean_(b.classroom, 30), contact: clean_(b.contact, 150),
+      status: 'new', reply: '', repliedByName: '', repliedAt: '', public: 'false', createdAt: now, updatedAt: now,
+    };
+    sheet_(SHEET_FEEDBACK).appendRow(FEEDBACK_HEADERS.map(h => v[h]));
+    cache.put(ck, String(sent + 1), 3600);
+    return { code };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ผู้ส่งใช้รหัสติดตามดูสถานะและคำตอบ
+function trackFeedback_(b) {
+  const codes = (Array.isArray(b.codes) ? b.codes : [b.code]).slice(0, 30)
+    .map(c => String(c || '').toUpperCase().replace(/[^A-Z0-9-]/g, '')).filter(c => c);
+  if (!codes.length) throw new Error('กรุณาใส่รหัสติดตามเรื่อง');
+  const rows = readRows_(SHEET_FEEDBACK, FEEDBACK_HEADERS).filter(f => codes.indexOf(str_(f.code)) >= 0);
+  if (!rows.length && !Array.isArray(b.codes)) throw new Error('ไม่พบรหัสติดตามเรื่องนี้');
+  return rows.map(f => Object.assign(feedbackOut_(f, false), { code: str_(f.code) }));
+}
+
+function listFeedback_(b) {
+  requireSession_(b.token, 'feedback');
+  return readRows_(SHEET_FEEDBACK, FEEDBACK_HEADERS).map(f => feedbackOut_(f, true))
+    .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
+}
+
+function updateFeedback_(b) {
+  const user = requireSession_(b.token, 'feedback');
+  const row = findRow_(SHEET_FEEDBACK, b.id);
+  const sheet = sheet_(SHEET_FEEDBACK);
+  const vals = sheet.getRange(row, 1, 1, FEEDBACK_HEADERS.length).getValues()[0];
+  const cur = Object.fromEntries(FEEDBACK_HEADERS.map((h, i) => [h, vals[i]]));
+  const reply = clean_(b.reply, 3000);
+  const now = new Date().toISOString();
+  const v = {
+    status: FEEDBACK_STATUSES.indexOf(b.status) >= 0 ? b.status : str_(cur.status) || 'new',
+    public: b.public === true ? 'true' : 'false', updatedAt: now, reply,
+  };
+  if (reply !== str_(cur.reply)) Object.assign(v, { repliedByName: reply ? user.name : '', repliedAt: reply ? now : '' });
+  sheet.getRange(row, 1, 1, FEEDBACK_HEADERS.length).setValues([FEEDBACK_HEADERS.map(h => h in v ? v[h] : cur[h])]);
+  return true;
 }
 
 /* ---------- กู้รหัสผู้ดูแล ---------- */

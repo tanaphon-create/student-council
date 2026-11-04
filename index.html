@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header class="topbar">
@@ -24,6 +24,7 @@
         <a href="#finance" data-route="finance">บัญชีสภา</a>
         <a href="#duty" data-route="duty">เช็คชื่อปฏิบัติงาน</a>
         <a href="#vote" data-route="vote">โหวต</a>
+        <a href="#feedback" data-route="feedback">ความคิดเห็น</a>
         <a href="#members" data-route="members" class="admin-only" hidden>ผู้ใช้และสิทธิ์</a>
       </nav>
       <div class="auth" id="authBox"></div>
@@ -87,7 +88,7 @@
           </a>
           <div class="feature"><span class="f-icon">📣</span><h3>ข่าวประชาสัมพันธ์</h3><p>ประกาศและข่าวสารกิจกรรมของสภานักเรียน</p><span class="tag">เร็ว ๆ นี้</span></div>
           <a class="feature active" href="#calendar"><span class="f-icon">📅</span><h3>ปฏิทินการปฏิบัติงาน</h3><p>กำหนดการประชุม กิจกรรม และเวรปฏิบัติงาน บันทึกโดยประธานนักเรียนและครู</p><span class="tag tag-live">เปิดใช้งาน</span></a>
-          <div class="feature"><span class="f-icon">💬</span><h3>รับฟังความคิดเห็น</h3><p>ส่งข้อเสนอแนะและเรื่องร้องเรียนถึงสภา</p><span class="tag">เร็ว ๆ นี้</span></div>
+          <a class="feature active" href="#feedback"><span class="f-icon">💬</span><h3>รับฟังความคิดเห็น</h3><p>ส่งข้อเสนอแนะ เรื่องร้องเรียน หรือคำชื่นชมถึงสภา ไม่ต้องระบุชื่อก็ได้ พร้อมรหัสติดตามเรื่อง</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#vote"><span class="f-icon">🗳️</span><h3>โหวต / สำรวจ</h3><p>ลงคะแนนและสำรวจความเห็นนักเรียน ผู้ดูแลเปิดโหวตได้ทั้งแบบทุกคน สมาชิกสภา หรือใช้รหัสโหวต</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <div class="feature"><span class="f-icon">👥</span><h3>ทำเนียบกรรมการ</h3><p>รายชื่อคณะกรรมการสภานักเรียนประจำปี</p><span class="tag">เร็ว ๆ นี้</span></div>
         </div>
@@ -177,6 +178,16 @@
       <div class="wrap" id="voteView"></div>
     </section>
 
+    <!-- รับฟังความคิดเห็น -->
+    <section class="page" id="page-feedback" hidden>
+      <div class="page-head">
+        <div class="wrap page-head-in">
+          <div><p class="eyebrow">เสียงของนักเรียน</p><h1>รับฟังความคิดเห็น</h1></div>
+        </div>
+      </div>
+      <div class="wrap" id="feedbackView"></div>
+    </section>
+
     <!-- จัดการสมาชิก -->
     <section class="page" id="page-members" hidden>
       <div class="page-head">
@@ -210,9 +221,10 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="config.js?v=2"></script>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
   <script src="duty.js?v=4"></script>
   <script src="calendar.js?v=1"></script>
   <script src="vote.js?v=1"></script>
+  <script src="feedback.js?v=1"></script>
 </body>
 </html>
