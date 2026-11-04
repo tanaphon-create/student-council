@@ -45,10 +45,20 @@
   const memberById = (id) => ds.members.find(m => m.id === id);
   const memberQ = (m) => [m.studentId, m.name, m.classroom, m.position].join(' ').toLowerCase();
   const dutyById = (id) => ds.duties.find(d => d.id === id);
+  // ลำดับรายชื่อ: ประธาน → รองประธาน → ตำแหน่งอื่น → สมาชิกทั่วไป แล้วเรียงตามห้อง เลขประจำตัว ชื่อ
+  const rankOf = (m) => {
+    const p = String(m.position || '').replace(/\s/g, '');
+    return /^รองประธาน/.test(p) ? 1 : /^ประธาน/.test(p) ? 0 : p ? 2 : 3;
+  };
+  const byRank = (a, b) => rankOf(a) - rankOf(b)
+    || String(a.classroom || '').localeCompare(String(b.classroom || ''), 'th', { numeric: true })
+    || String(a.studentId || '').localeCompare(String(b.studentId || ''), 'th', { numeric: true })
+    || String(a.name || '').localeCompare(String(b.name || ''), 'th');
+  const orderIds = (ids) => [...ids].sort((a, b) => byRank(memberById(a) || {}, memberById(b) || {}));
 
   async function load() {
     const data = await SC.apiGet('duty');
-    ds.members = data.members;
+    ds.members = [...data.members].sort(byRank);
     ds.duties = data.duties;
     ds.att = data.attendance;
     ds.idx = new Map(ds.att.map(a => [key(a.dutyId, a.date, a.memberId), a]));
@@ -233,7 +243,7 @@
           ${Object.entries(STATUS).map(([k, v]) => `<button class="btn btn-ghost btn-sm" data-all="${k}">${v.label}</button>`).join('')}
           <button class="btn-link" data-all="">ล้างทั้งหมด</button>
         </div>` : ''}
-        <ol class="sheet">${d.memberIds.map((id, i) => sheetRow(id, i, editable)).join('')}</ol>
+        <ol class="sheet">${orderIds(d.memberIds).map((id, i) => sheetRow(id, i, editable)).join('')}</ol>
         ${editable ? `<div class="sheet-save"><span class="hint" id="dirtyMsg"></span><button class="btn btn-in" id="btnSaveAtt">บันทึกการเช็คชื่อ</button></div>` : ''}
       </div>`;
     $$('.dchip').forEach(b => (b.onclick = () => {
@@ -306,7 +316,7 @@
   function renderSummary(d) {
     const s = summarize(d);
     const dates = d.mode === 'daily' ? scheduleDates(d) : [];
-    const rows = d.memberIds.map(id => ({ id, m: memberById(id) || { name: '(ไม่พบรายชื่อ)' }, p: s.per[id] }));
+    const rows = orderIds(d.memberIds).map(id => ({ id, m: memberById(id) || { name: '(ไม่พบรายชื่อ)' }, p: s.per[id] }));
     $('#dutyTab').innerHTML = `
       <div class="stats">
         <div class="stat stat-balance"><span>อัตรามาปฏิบัติงาน (มา + สาย)</span><strong>${s.rate == null ? '—' : s.rate + '%'}</strong></div>
@@ -425,8 +435,7 @@
   /* ================= รายชื่อสมาชิก ================= */
   function renderRoster() {
     const editable = can('attendance');
-    const list = [...ds.members].sort((a, b) => (b.active - a.active) || String(a.classroom).localeCompare(String(b.classroom), 'th', { numeric: true })
-      || String(a.studentId || '').localeCompare(String(b.studentId || ''), 'th', { numeric: true }) || a.name.localeCompare(b.name, 'th'));
+    const list = [...ds.members].sort((a, b) => (b.active - a.active) || byRank(a, b));
     $('#dutyView').innerHTML = `
       <a href="#duty" class="back-link">← งานทั้งหมด</a>
       <div class="card">
