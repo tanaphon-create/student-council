@@ -553,7 +553,7 @@
   /* ================= router ================= */
   function route() {
     let [r, param] = (location.hash || '#home').slice(1).split('/');
-    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback'].includes(r)) r = 'home';
+    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee'].includes(r)) r = 'home';
     if (r === 'members' && !isAdmin()) r = 'finance';
     const page = r === 'calendar' ? 'home' : r; // ปฏิทินอยู่ในหน้าแรก
     $$('.page').forEach(p => (p.hidden = p.id !== 'page-' + page));
@@ -562,6 +562,7 @@
     if (r === 'duty') document.dispatchEvent(new CustomEvent('sc:duty', { detail: param || '' }));
     if (r === 'vote') document.dispatchEvent(new CustomEvent('sc:vote', { detail: param || '' }));
     if (r === 'feedback') document.dispatchEvent(new CustomEvent('sc:feedback', { detail: param || '' }));
+    if (r === 'committee') document.dispatchEvent(new CustomEvent('sc:committee'));
     window.scrollTo(0, 0);
     if (page === 'home') document.dispatchEvent(new CustomEvent('sc:home', { detail: { scroll: r === 'calendar' } }));
   }

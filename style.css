@@ -601,6 +601,34 @@ code { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; background
   .ib-side { flex-direction: row; gap: 10px; align-items: center; }
 }
 
+/* ---------- ทำเนียบกรรมการ ---------- */
+.cm-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.cm-tools input { flex: 1; min-width: 200px; }
+.cm-sec { margin-bottom: 26px; }
+.cm-pres { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; margin: 10px 0 28px; }
+.cm-pres .cm-card { min-width: 300px; border-top: 4px solid var(--gold-500); }
+.cm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.cm-exec { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.cm-card { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); break-inside: avoid; }
+.cm-avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 600 19px 'Prompt'; color: var(--green-800); background: var(--green-50); border: 2px solid var(--gold-300); }
+.cm-big { padding: 16px 18px; }
+.cm-big .cm-avatar { width: 60px; height: 60px; font-size: 25px; background: linear-gradient(135deg, var(--green-700), var(--green-600)); color: #fff; border-color: var(--gold-500); }
+.cm-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.cm-text b { font: 600 16px 'Prompt'; color: var(--ink); }
+.cm-big .cm-text b { font-size: 18px; }
+.cm-pos { color: #7a5a00; font-weight: 600; font-size: 14px; }
+.cm-text small { color: var(--muted); }
+.cm-class { font-size: 17px; color: var(--green-800); margin: 18px 0 10px; padding-left: 10px; border-left: 4px solid var(--gold-500); }
+.cm-class small { color: var(--muted); font: 400 14px 'Sarabun'; }
+.cm-plain .cm-card { box-shadow: none; padding: 10px 12px; }
+.cm-plain .cm-avatar { width: 36px; height: 36px; font-size: 16px; }
+@media (max-width: 860px) {
+  .cm-pres .cm-card { min-width: 0; width: 100%; }
+  .cm-grid, .cm-exec { grid-template-columns: 1fr 1fr; }
+  .cm-plain { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) { .cm-grid, .cm-exec { grid-template-columns: 1fr; } }
+
 /* ---------- responsive ---------- */
 @media (max-width: 860px) {
   .topbar-in { flex-wrap: wrap; gap: 8px 12px; padding: 8px 0; }
@@ -646,10 +674,12 @@ code { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; background
 }
 
 @media print {
-  .topbar, .demo-banner, .toolbar, .head-actions, .tabs, .sheet-tools, .cal-section, .sheet-save, .date-strip, .back-link, .footer, .chart-card, .toast { display: none !important; }
+  .topbar, .demo-banner, .toolbar, .cm-tools, .cm-stats, .head-actions, .tabs, .sheet-tools, .cal-section, .sheet-save, .date-strip, .back-link, .footer, .chart-card, .toast { display: none !important; }
   .page-head { background: none; color: #000; border: 0; }
   .card, .stat { box-shadow: none; }
   body { background: #fff; }
+  .cm-grid { grid-template-columns: repeat(3, 1fr); }
+  .cm-card { box-shadow: none; }
   body.print-codes > :not(#printCodes) { display: none !important; }
   body.print-codes #printCodes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
   .slip { border: 1px dashed #999; padding: 10px 12px; text-align: center; display: flex; flex-direction: column; gap: 2px; break-inside: avoid; font-size: 11px; }
