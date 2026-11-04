@@ -32,6 +32,7 @@ const SHEET_VOTERS = 'Voters';
 const SHEET_CODES = 'VoteCodes';
 const SHEET_FEEDBACK = 'Feedback';
 const SHEET_PHOTOS = 'Photos';
+const SHEET_ADVISORS = 'Advisors';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
@@ -65,6 +66,8 @@ const FEEDBACK_PER_HOUR = 5;
 // รูปกรรมการ: เว็บย่อเป็นรูปจัตุรัสเล็กแล้วส่งมาเป็น data URL เก็บในชีต (ช่องละไม่เกิน 50,000 ตัวอักษร)
 const PHOTO_HEADERS = ['memberId', 'data', 'updatedByName', 'updatedAt'];
 const PHOTO_MAX = 45000;
+// ครูที่ปรึกษา: แยกจากรายชื่อนักเรียน (ไม่เข้าระบบเช็คชื่อ) แสดงบนสุดของทำเนียบ
+const ADVISOR_HEADERS = ['id', 'name', 'position', 'sort', 'active', 'updatedByName', 'updatedAt'];
 
 /* ---------- ติดตั้งครั้งแรก (รันซ้ำได้ ไม่ลบข้อมูลเดิม) ---------- */
 function setup() {
@@ -92,6 +95,7 @@ function setup() {
   ensure(SHEET_CODES, CODE_HEADERS, true);
   ensure(SHEET_FEEDBACK, FEEDBACK_HEADERS, true);
   ensure(SHEET_PHOTOS, PHOTO_HEADERS, true);
+  ensure(SHEET_ADVISORS, ADVISOR_HEADERS, true);
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -110,6 +114,7 @@ function doGet(e) {
     if (action === 'polls') return json_({ ok: true, data: listPolls_(false) });
     if (action === 'feedback') return json_({ ok: true, data: publicFeedback_() });
     if (action === 'photos') return json_({ ok: true, data: listPhotos_() });
+    if (action === 'advisors') return json_({ ok: true, data: listAdvisors_() });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -128,7 +133,7 @@ function doPost(e) {
       saveEvent: saveEvent_, deleteEvent: deleteEvent_,
       vote: vote_, adminPolls: adminPolls_, savePoll: savePoll_, setPollStatus: setPollStatus_, deletePoll: deletePoll_,
       genVoteCodes: genVoteCodes_, listVoteCodes: listVoteCodes_,
-      setMemberPhoto: setMemberPhoto_,
+      setMemberPhoto: setMemberPhoto_, saveAdvisor: saveAdvisor_, deleteAdvisor: deleteAdvisor_,
       submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
     };
     const fn = handlers[body.action];
@@ -792,7 +797,8 @@ function listPhotos_() {
 // data ว่าง = ลบรูป
 function setMemberPhoto_(b) {
   const user = requireSession_(b.token, 'attendance');
-  findRow_(SHEET_MEMBERS, b.memberId); // ต้องเป็นสมาชิกที่มีอยู่จริง
+  // ต้องเป็นสมาชิกหรือครูที่ปรึกษาที่มีอยู่จริง
+  try { findRow_(SHEET_MEMBERS, b.memberId); } catch (_) { findRow_(SHEET_ADVISORS, b.memberId); }
   const data = String(b.data || '');
   if (data && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(data) || data.length > PHOTO_MAX)) {
     throw new Error('ไฟล์รูปไม่ถูกต้องหรือใหญ่เกินไป');
@@ -810,6 +816,37 @@ function setMemberPhoto_(b) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ---------- ครูที่ปรึกษา ---------- */
+function listAdvisors_() {
+  return readRows_(SHEET_ADVISORS, ADVISOR_HEADERS).filter(a => str_(a.active) !== 'false')
+    .map(a => ({ id: str_(a.id), name: str_(a.name), position: str_(a.position), sort: Number(a.sort) || 0 }))
+    .sort((x, y) => x.sort - y.sort || x.name.localeCompare(y.name));
+}
+
+function saveAdvisor_(b) {
+  const user = requireSession_(b.token, 'attendance');
+  const name = clean_(b.name, 100);
+  if (!name) throw new Error('กรุณาระบุชื่อครู');
+  const v = { name, position: clean_(b.position, 100) || 'ครูที่ปรึกษา', sort: Math.floor(Number(b.sort) || 0), active: 'true',
+    updatedByName: user.name, updatedAt: new Date().toISOString() };
+  const sheet = sheet_(SHEET_ADVISORS);
+  if (b.id) {
+    const row = findRow_(SHEET_ADVISORS, b.id);
+    sheet.getRange(row, 1, 1, ADVISOR_HEADERS.length).setValues([ADVISOR_HEADERS.map(h => h === 'id' ? String(b.id) : v[h])]);
+    return { id: b.id };
+  }
+  const id = Utilities.getUuid();
+  sheet.appendRow(ADVISOR_HEADERS.map(h => h === 'id' ? id : v[h]));
+  return { id };
+}
+
+function deleteAdvisor_(b) {
+  requireSession_(b.token, 'attendance');
+  const row = findRow_(SHEET_ADVISORS, b.id);
+  sheet_(SHEET_ADVISORS).getRange(row, ADVISOR_HEADERS.indexOf('active') + 1).setValue('false');
+  return true;
 }
 
 /* ---------- รับฟังความคิดเห็น ---------- */

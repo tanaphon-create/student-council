@@ -4,7 +4,7 @@
   const SC = window.SC;
   const { $, $$, esc, can, toast, openDialog, dlgHead } = SC;
 
-  const cs = { members: null, photos: {}, q: '', mode: 'list' };
+  const cs = { members: null, advisors: [], photos: {}, q: '', mode: 'list' };
   const PREFIX = /^(นางสาว|นาย|นาง|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)\s*/;
   // ตำแหน่งบริหารเรียงตามลำดับนี้ ตำแหน่งอื่นจัดกลุ่มตาม "ฝ่าย..."
   const EXEC = [/^ประธาน/, /^รองประธาน/, /^เลขานุการ/, /^ผู้ช่วยเลขานุการ/, /^เหรัญญิก/, /^ผู้ช่วยเหรัญญิก/, /^ปฏิคม/, /^ประชาสัมพันธ์/, /^นายทะเบียน/];
@@ -22,8 +22,9 @@
     cs.mode = e.detail === 'chart' ? 'chart' : 'list';
     if (cs.members) render(); else $('#committeeView').innerHTML = '<p class="empty">กำลังโหลดข้อมูล…</p>';
     try {
-      const [duty, photos] = await Promise.all([SC.apiGet('duty'), SC.apiGet('photos').catch(() => ({}))]);
+      const [duty, photos, advisors] = await Promise.all([SC.apiGet('duty'), SC.apiGet('photos').catch(() => ({})), SC.apiGet('advisors').catch(() => [])]);
       cs.members = duty.members.filter(m => m.active);
+      cs.advisors = advisors || [];
       cs.photos = photos || {};
       render();
     } catch (err) {
@@ -57,7 +58,9 @@
   const card = (m, big) => `<div class="cm-card ${big ? 'cm-big' : ''}">
     ${can('attendance') ? `<button class="cm-photo-btn" data-photo="${esc(m.id)}" title="ใส่/เปลี่ยนรูป" aria-label="ใส่รูปของ ${esc(m.name)}">${avatar(m)}<span class="cm-cam" aria-hidden="true">📷</span></button>` : avatar(m)}
     <span class="cm-text"><b>${esc(m.name)}</b>${posOf(m) ? `<span class="cm-pos">${esc(posOf(m))}</span>` : ''}<small>${esc(m.classroom || '')}</small></span>
+    ${m.teacher && can('attendance') ? `<button class="cm-edit" data-adv="${esc(m.id)}" title="แก้ไข" aria-label="แก้ไขข้อมูล ${esc(m.name)}">✎</button>` : ''}
   </div>`;
+  const teachers = () => cs.advisors.map(a => ({ ...a, teacher: true, classroom: '' }));
 
   function render() {
     const all = cs.members;
@@ -83,9 +86,10 @@
         </div>
         ${cs.mode === 'list' ? `<input type="search" id="cmQ" placeholder="ค้นหาชื่อ ชั้น หรือตำแหน่ง" value="${esc(cs.q)}" aria-label="ค้นหากรรมการ">` : '<span class="spacer"></span>'}
         <button class="btn btn-ghost btn-sm" id="cmPrint">พิมพ์ทำเนียบ</button>
-        ${can('attendance') ? '<a class="btn btn-ghost btn-sm" href="#duty/roster">แก้ไขรายชื่อ / ตำแหน่ง</a>' : ''}
+        ${can('attendance') ? '<button class="btn btn-ghost btn-sm" id="cmAddAdv">+ ครูที่ปรึกษา</button><a class="btn btn-ghost btn-sm" href="#duty/roster">แก้ไขรายชื่อ / ตำแหน่ง</a>' : ''}
       </div>
       ${cs.mode === 'chart' ? chartHtml(groups(all)) : `
+      ${teachers().length && !s ? `<section class="cm-sec cm-teachers"><h2 class="section-title">ครูที่ปรึกษา</h2><div class="cm-pres">${teachers().map(m => card(m, true)).join('')}</div></section>` : ''}
       ${!list.length ? '<div class="card"><p class="empty">ไม่พบรายชื่อ</p></div>' : ''}
       ${pres.length ? `<div class="cm-pres">${pres.map(m => card(m, true)).join('')}</div>` : ''}
       ${execRest.length ? sec('คณะกรรมการบริหาร', `<div class="cm-grid cm-exec">${execRest.map(m => card(m, true)).join('')}</div>`) : ''}
@@ -98,15 +102,18 @@
     const q = $('#cmQ');
     if (q) q.oninput = () => { cs.q = q.value; const pos = q.selectionStart; render(); const n = $('#cmQ'); n.focus(); n.setSelectionRange(pos, pos); };
     $('#cmPrint').onclick = () => window.print();
-    $$('[data-photo]').forEach(b => (b.onclick = () => photoDialog(cs.members.find(m => m.id === b.dataset.photo))));
+    $$('[data-photo]').forEach(b => (b.onclick = () => photoDialog(cs.members.concat(teachers()).find(m => m.id === b.dataset.photo))));
+    $$('[data-adv]').forEach(b => (b.onclick = () => advisorForm(cs.advisors.find(a => a.id === b.dataset.adv))));
+    const add = $('#cmAddAdv');
+    if (add) add.onclick = () => advisorForm(null);
     const wrap = $('.org-wrap');
     if (wrap) wrap.scrollLeft = (wrap.scrollWidth - wrap.clientWidth) / 2; // ผังกว้างกว่าจอ: เริ่มที่กึ่งกลาง
   }
 
   /* ================= ผังองค์กร ================= */
-  const node = (m) => `<div class="org-node">${avatar(m)}<b>${esc(m.name)}</b><span class="cm-pos">${esc(posOf(m))}</span><small>${esc(m.classroom || '')}</small></div>`;
+  const node = (m) => `<div class="org-node">${avatar(m)}<b>${esc(m.name)}</b><span class="cm-pos">${esc(posOf(m))}</span>${m.classroom ? `<small>${esc(m.classroom)}</small>` : ''}</div>`;
   // แถวของตำแหน่งระดับเดียวกัน: up/down = มีเส้นเชื่อมระดับบน/ล่าง
-  const row = (ms, up, down) => `<div class="org-row ${ms.length > 1 ? 'multi' : ''} ${up ? 'up' : ''} ${down ? 'down' : ''}">
+  const row = (ms, up, down, cls) => `<div class="org-row ${cls || ''} ${ms.length > 1 ? 'multi' : ''} ${up ? 'up' : ''} ${down ? 'down' : ''}">
     ${ms.map(m => `<div class="org-cell"><i class="ob" aria-hidden="true"></i>${node(m)}</div>`).join('')}</div>`;
   const stem = '<div class="org-stem" aria-hidden="true"></div>';
 
@@ -117,13 +124,13 @@
     const board = g.exec.filter(m => !pres.includes(m) && !vice.includes(m));
     const depts = g.sides.concat(g.others.length ? [['ตำแหน่งอื่น ๆ', g.others]] : []);
     const plain = g.plain.reduce((n, [, ms]) => n + ms.length, 0);
-    const levels = [pres, vice, board].filter(l => l.length);
+    const levels = [teachers(), pres, vice, board].filter(l => l.length);
     const tail = depts.length || plain;
     if (!levels.length && !depts.length) {
       return `<div class="card"><p class="empty">ยังไม่มีตำแหน่ง จึงยังสร้างผังไม่ได้</p>
         <p class="hint" style="text-align:center">ใส่ตำแหน่ง เช่น ประธานสภานักเรียน รองประธาน เลขานุการ หัวหน้าฝ่าย… ในหน้า “รายชื่อสมาชิก”</p></div>`;
     }
-    const parts = levels.map((l, i) => row(l, i > 0, i < levels.length - 1 || !!tail));
+    const parts = levels.map((l, i) => row(l, i > 0, i < levels.length - 1 || !!tail, l === pres ? 'org-pres' : l[0].teacher ? 'org-teach' : ''));
     let html = parts.join(stem);
     if (depts.length) {
       html += (levels.length ? stem : '') + `<div class="org-depts">
@@ -207,8 +214,50 @@
     if (del) del.onclick = () => { if (confirm(`ลบรูปของ ${m.name}?`)) send('', del, 'ลบรูปแล้ว'); };
   }
 
+  /* ================= ครูที่ปรึกษา ================= */
+  function advisorForm(a) {
+    openDialog(`${dlgHead(a ? 'แก้ไขครูที่ปรึกษา' : 'เพิ่มครูที่ปรึกษา')}
+      <form class="dlg-body" id="fAdv">
+        <div class="field"><label for="ad1">ชื่อ-สกุล</label><input id="ad1" name="fullname" maxlength="100" value="${esc(a ? a.name : '')}" placeholder="เช่น นายสมชาย ใจดี" required></div>
+        <div class="field"><label for="ad2">ตำแหน่ง</label><input id="ad2" name="pos" maxlength="100" value="${esc(a ? a.position : 'ครูที่ปรึกษาสภานักเรียน')}"></div>
+        <div class="field"><label for="ad3">ลำดับการแสดง <small>(เลขน้อยขึ้นก่อน)</small></label><input id="ad3" name="sort" type="number" min="0" max="99" value="${a ? a.sort : cs.advisors.length + 1}"></div>
+        <p class="hint">ใส่รูปได้โดยกดที่วงกลมรูป 📷 ในทำเนียบหลังบันทึก</p>
+        <p class="err"></p>
+        <div class="dlg-actions">
+          ${a ? '<button type="button" class="btn btn-ghost danger-link" id="advDel">ลบ</button><span class="spacer"></span>' : ''}
+          <button type="button" class="btn btn-ghost" data-close>ยกเลิก</button><button type="submit" class="btn btn-gold">บันทึก</button>
+        </div>
+      </form>`);
+    const f = $('#fAdv');
+    const reload = async (msg) => { cs.advisors = await SC.apiGet('advisors'); SC.dialog.close(); toast(msg); render(); };
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      SC.submitting(f, async () => {
+        await SC.authed({ action: 'saveAdvisor', id: a ? a.id : '', name: f.fullname.value, position: f.pos.value, sort: Number(f.sort.value) || 0 });
+        await reload(a ? 'บันทึกแล้ว' : 'เพิ่มครูที่ปรึกษาแล้ว');
+      });
+    };
+    const del = $('#advDel');
+    if (del) del.onclick = async () => {
+      if (!confirm(`ลบ ${a.name} ออกจากทำเนียบ?`)) return;
+      try { await SC.authed({ action: 'deleteAdvisor', id: a.id }); await reload('ลบแล้ว'); } catch (x) { toast(x.message, true); }
+    };
+  }
+
   /* ============ โหมดทดลอง ============ */
   const ext = SC.demoExt;
+  ext.advisors = (db) => JSON.parse(JSON.stringify((db.advisors || []).filter(a => a.active !== false).sort((x, y) => x.sort - y.sort)));
+  ext.saveAdvisor = (db, b, sess) => {
+    sess('attendance');
+    if (!String(b.name || '').trim()) throw new Error('กรุณาระบุชื่อครู');
+    db.advisors = db.advisors || [];
+    const v = { name: b.name.trim(), position: String(b.position || '').trim() || 'ครูที่ปรึกษา', sort: Math.floor(b.sort) || 0, active: true };
+    if (b.id) { Object.assign(db.advisors.find(a => a.id === b.id), v); return { id: b.id }; }
+    const id = SC.uid();
+    db.advisors.push({ id, ...v });
+    return { id };
+  };
+  ext.deleteAdvisor = (db, b, sess) => { sess('attendance'); db.advisors.find(a => a.id === b.id).active = false; return true; };
   ext.photos = (db) => JSON.parse(JSON.stringify(db.photos || {}));
   ext.setMemberPhoto = (db, b, sess) => {
     sess('attendance');
