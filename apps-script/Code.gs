@@ -31,6 +31,7 @@ const SHEET_VOTES = 'Votes';
 const SHEET_VOTERS = 'Voters';
 const SHEET_CODES = 'VoteCodes';
 const SHEET_FEEDBACK = 'Feedback';
+const SHEET_PHOTOS = 'Photos';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
@@ -61,6 +62,9 @@ const FEEDBACK_HEADERS = ['id', 'code', 'category', 'subject', 'detail', 'name',
 const FEEDBACK_CATEGORIES = ['suggest', 'complain', 'praise', 'question', 'other'];
 const FEEDBACK_STATUSES = ['new', 'progress', 'done', 'rejected'];
 const FEEDBACK_PER_HOUR = 5;
+// รูปกรรมการ: เว็บย่อเป็นรูปจัตุรัสเล็กแล้วส่งมาเป็น data URL เก็บในชีต (ช่องละไม่เกิน 50,000 ตัวอักษร)
+const PHOTO_HEADERS = ['memberId', 'data', 'updatedByName', 'updatedAt'];
+const PHOTO_MAX = 45000;
 
 /* ---------- ติดตั้งครั้งแรก (รันซ้ำได้ ไม่ลบข้อมูลเดิม) ---------- */
 function setup() {
@@ -87,6 +91,7 @@ function setup() {
   ensure(SHEET_VOTERS, VOTER_HEADERS, true);
   ensure(SHEET_CODES, CODE_HEADERS, true);
   ensure(SHEET_FEEDBACK, FEEDBACK_HEADERS, true);
+  ensure(SHEET_PHOTOS, PHOTO_HEADERS, true);
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -104,6 +109,7 @@ function doGet(e) {
     if (action === 'events') return json_({ ok: true, data: listEvents_() });
     if (action === 'polls') return json_({ ok: true, data: listPolls_(false) });
     if (action === 'feedback') return json_({ ok: true, data: publicFeedback_() });
+    if (action === 'photos') return json_({ ok: true, data: listPhotos_() });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -122,6 +128,7 @@ function doPost(e) {
       saveEvent: saveEvent_, deleteEvent: deleteEvent_,
       vote: vote_, adminPolls: adminPolls_, savePoll: savePoll_, setPollStatus: setPollStatus_, deletePoll: deletePoll_,
       genVoteCodes: genVoteCodes_, listVoteCodes: listVoteCodes_,
+      setMemberPhoto: setMemberPhoto_,
       submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
     };
     const fn = handlers[body.action];
@@ -773,6 +780,36 @@ function listVoteCodes_(b) {
   requireSession_(b.token, 'admin');
   return readRows_(SHEET_CODES, CODE_HEADERS).filter(c => str_(c.pollId) === String(b.pollId))
     .map(c => ({ code: str_(c.code), used: str_(c.used) === 'true' }));
+}
+
+/* ---------- รูปกรรมการ ---------- */
+function listPhotos_() {
+  const out = {};
+  readRows_(SHEET_PHOTOS, PHOTO_HEADERS).forEach(r => { if (str_(r.data)) out[str_(r.memberId)] = str_(r.data); });
+  return out;
+}
+
+// data ว่าง = ลบรูป
+function setMemberPhoto_(b) {
+  const user = requireSession_(b.token, 'attendance');
+  findRow_(SHEET_MEMBERS, b.memberId); // ต้องเป็นสมาชิกที่มีอยู่จริง
+  const data = String(b.data || '');
+  if (data && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(data) || data.length > PHOTO_MAX)) {
+    throw new Error('ไฟล์รูปไม่ถูกต้องหรือใหญ่เกินไป');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = sheet_(SHEET_PHOTOS);
+    const ids = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().map(r => String(r[0]));
+    const i = ids.indexOf(String(b.memberId));
+    const row = [String(b.memberId), data, user.name, new Date().toISOString()];
+    if (i >= 0) sheet.getRange(i + 2, 1, 1, PHOTO_HEADERS.length).setValues([row]);
+    else if (data) sheet.appendRow(row);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* ---------- รับฟังความคิดเห็น ---------- */

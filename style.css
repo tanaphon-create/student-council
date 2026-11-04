@@ -613,6 +613,16 @@ code { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; background
 .cm-avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 600 19px 'Prompt'; color: var(--green-800); background: var(--green-50); border: 2px solid var(--gold-300); }
 .cm-big { padding: 16px 18px; }
 .cm-big .cm-avatar { width: 60px; height: 60px; font-size: 25px; background: linear-gradient(135deg, var(--green-700), var(--green-600)); color: #fff; border-color: var(--gold-500); }
+.cm-photo { object-fit: cover; padding: 0; }
+.cm-photo-btn { position: relative; flex: none; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%; }
+.cm-photo-btn:focus-visible { outline: 3px solid var(--gold-300); outline-offset: 2px; }
+.cm-cam { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); display: grid; place-items: center; font-size: 12px; }
+.cm-photo-dlg { text-align: center; }
+.cm-photo-dlg .dlg-actions { align-items: center; }
+.cm-photo-dlg .spacer { flex: 1; }
+.cm-preview { width: 160px; height: 160px; margin: 4px auto 12px; border-radius: 50%; overflow: hidden; border: 3px solid var(--gold-500); background: var(--green-50); display: grid; place-items: center; }
+.cm-preview img { width: 100%; height: 100%; object-fit: cover; }
+.cm-preview span { font: 600 56px 'Prompt'; color: var(--green-800); }
 .cm-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
 .cm-text b { font: 600 16px 'Prompt'; color: var(--ink); }
 .cm-big .cm-text b { font-size: 18px; }
@@ -674,7 +684,7 @@ code { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; background
 }
 
 @media print {
-  .topbar, .demo-banner, .toolbar, .cm-tools, .cm-stats, .head-actions, .tabs, .sheet-tools, .cal-section, .sheet-save, .date-strip, .back-link, .footer, .chart-card, .toast { display: none !important; }
+  .topbar, .demo-banner, .toolbar, .cm-tools, .cm-stats, .cm-cam, .head-actions, .tabs, .sheet-tools, .cal-section, .sheet-save, .date-strip, .back-link, .footer, .chart-card, .toast { display: none !important; }
   .page-head { background: none; color: #000; border: 0; }
   .card, .stat { box-shadow: none; }
   body { background: #fff; }
