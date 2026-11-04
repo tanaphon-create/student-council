@@ -85,7 +85,8 @@
           <a href="#committee/chart" role="tab" aria-selected="${cs.mode === 'chart'}" class="${cs.mode === 'chart' ? 'on' : ''}">⧉ ผังองค์กร</a>
         </div>
         ${cs.mode === 'list' ? `<input type="search" id="cmQ" placeholder="ค้นหาชื่อ ชั้น หรือตำแหน่ง" value="${esc(cs.q)}" aria-label="ค้นหากรรมการ">` : '<span class="spacer"></span>'}
-        <button class="btn btn-ghost btn-sm" id="cmPrint">พิมพ์ทำเนียบ</button>
+        ${cs.mode === 'chart' ? '<button class="btn btn-ghost btn-sm" id="cmPrintChart">🖨 พิมพ์ผัง A4 แนวนอน</button>' : '<button class="btn btn-ghost btn-sm" id="cmPrint">🖨 พิมพ์รายชื่อ</button>'}
+        ${cs.advisors.length ? '<button class="btn btn-ghost btn-sm" id="cmPrintTeach">🖨 พิมพ์ครูที่ปรึกษา</button>' : ''}
         ${can('attendance') ? '<button class="btn btn-ghost btn-sm" id="cmAddAdv">+ ครูที่ปรึกษา</button><a class="btn btn-ghost btn-sm" href="#duty/roster">แก้ไขรายชื่อ / ตำแหน่ง</a>' : ''}
       </div>
       ${cs.mode === 'chart' ? chartHtml(groups(all)) : `
@@ -101,7 +102,10 @@
       ${!g.exec.length && !s && can('attendance') ? '<p class="hint" style="text-align:center;margin-bottom:30px">ใส่ตำแหน่งในหน้า “รายชื่อสมาชิก” แล้วประธาน รองประธาน และฝ่ายต่าง ๆ จะแยกขึ้นด้านบนอัตโนมัติ</p>' : ''}`}`;
     const q = $('#cmQ');
     if (q) q.oninput = () => { cs.q = q.value; const pos = q.selectionStart; render(); const n = $('#cmQ'); n.focus(); n.setSelectionRange(pos, pos); };
-    $('#cmPrint').onclick = () => window.print();
+    const pr = $('#cmPrint'), pc = $('#cmPrintChart'), pt = $('#cmPrintTeach');
+    if (pr) pr.onclick = () => window.print();
+    if (pc) pc.onclick = () => printSheet(`คณะกรรมการสภานักเรียน ประจำปีการศึกษา ${year()}`, chartHtml(groups(cs.members), { teachers: false, bare: true }), 'ps-chart');
+    if (pt) pt.onclick = () => printSheet(`ครูที่ปรึกษาคณะกรรมการสภานักเรียน ประจำปีการศึกษา ${year()}`, teacherSheet(), 'ps-teach');
     $$('[data-photo]').forEach(b => (b.onclick = () => photoDialog(cs.members.concat(teachers()).find(m => m.id === b.dataset.photo))));
     $$('[data-adv]').forEach(b => (b.onclick = () => advisorForm(cs.advisors.find(a => a.id === b.dataset.adv))));
     const add = $('#cmAddAdv');
@@ -111,20 +115,21 @@
   }
 
   /* ================= ผังองค์กร ================= */
-  const node = (m) => `<div class="org-node">${avatar(m)}<b>${esc(m.name)}</b><span class="cm-pos">${esc(posOf(m))}</span>${m.classroom ? `<small>${esc(m.classroom)}</small>` : ''}</div>`;
+  const node = (m) => `<div class="org-node">${avatar(m)}<span class="on-t"><b>${esc(m.name)}</b><span class="cm-pos">${esc(posOf(m))}</span>${m.classroom ? `<small>${esc(m.classroom)}</small>` : ''}</span></div>`;
   // แถวของตำแหน่งระดับเดียวกัน: up/down = มีเส้นเชื่อมระดับบน/ล่าง
   const row = (ms, up, down, cls) => `<div class="org-row ${cls || ''} ${ms.length > 1 ? 'multi' : ''} ${up ? 'up' : ''} ${down ? 'down' : ''}">
     ${ms.map(m => `<div class="org-cell"><i class="ob" aria-hidden="true"></i>${node(m)}</div>`).join('')}</div>`;
   const stem = '<div class="org-stem" aria-hidden="true"></div>';
 
-  function chartHtml(g) {
+  // opt.teachers = รวมครูที่ปรึกษาไว้บนสุด, opt.bare = ไม่มีกรอบการ์ด (ใช้ตอนพิมพ์)
+  function chartHtml(g, opt = {}) {
     const flat = (p) => posOf(p).replace(/\s/g, '');
     const pres = g.exec.filter(m => /^ประธาน/.test(flat(m)));
     const vice = g.exec.filter(m => /^รองประธาน/.test(flat(m)));
     const board = g.exec.filter(m => !pres.includes(m) && !vice.includes(m));
     const depts = g.sides.concat(g.others.length ? [['ตำแหน่งอื่น ๆ', g.others]] : []);
     const plain = g.plain.reduce((n, [, ms]) => n + ms.length, 0);
-    const levels = [teachers(), pres, vice, board].filter(l => l.length);
+    const levels = [opt.teachers === false ? [] : teachers(), pres, vice, board].filter(l => l.length);
     const tail = depts.length || plain;
     if (!levels.length && !depts.length) {
       return `<div class="card"><p class="empty">ยังไม่มีตำแหน่ง จึงยังสร้างผังไม่ได้</p>
@@ -137,7 +142,7 @@
         <div class="org-depts-title">ฝ่ายงาน <small>${depts.length} ฝ่าย</small></div>
         <div class="org-dgrid">${depts.map(([name, ms]) => {
           const heads = ms.filter(m => head(m) < 2), rest = ms.filter(m => head(m) === 2);
-          return `<div class="org-dept">
+          return `<div class="org-dept ${rest.length > 9 ? 'wide' : ''}">
             <h4>${esc(name)} <small>${ms.length} คน</small></h4>
             ${heads.map(m => `<div class="org-head">${avatar(m)}<span><b>${esc(m.name)}</b><small>${esc(posOf(m))} · ${esc(m.classroom || '')}</small></span></div>`).join('')}
             ${rest.length ? `<ul>${rest.map(m => `<li>${esc(m.name)} <small>${esc(m.classroom || '')}</small></li>`).join('')}</ul>` : ''}
@@ -145,8 +150,8 @@
         }).join('')}</div>
       </div>`;
     }
-    if (plain) html += stem + `<div class="org-plain">สมาชิกสภานักเรียน <b>${plain}</b> คน · <a href="#committee">ดูรายชื่อทั้งหมด</a></div>`;
-    return `<div class="card org-card"><div class="org-wrap"><div class="org">${html}</div></div></div>`;
+    if (plain) html += stem + `<div class="org-plain">สมาชิกสภานักเรียน <b>${plain}</b> คน${opt.bare ? '' : ' · <a href="#committee">ดูรายชื่อทั้งหมด</a>'}</div>`;
+    return opt.bare ? `<div class="org">${html}</div>` : `<div class="card org-card"><div class="org-wrap"><div class="org">${html}</div></div></div>`;
   }
 
   /* ================= รูปกรรมการ ================= */
@@ -212,6 +217,41 @@
     save.onclick = () => send(data, save, 'บันทึกรูปแล้ว');
     const del = $('#cmDel');
     if (del) del.onclick = () => { if (confirm(`ลบรูปของ ${m.name}?`)) send('', del, 'ลบรูปแล้ว'); };
+  }
+
+  /* ================= พิมพ์ A4 แนวนอน 1 หน้า ================= */
+  const year = () => (window.SC_CONFIG || {}).ACADEMIC_YEAR || '';
+  const teacherSheet = () => `<div class="pt-grid">${teachers().map(t => `<div class="pt-card">${avatar(t)}<b>${esc(t.name)}</b><span>${esc(t.position)}</span></div>`).join('')}</div>`;
+
+  // สร้างหน้าพิมพ์นอกจอ วัดขนาดแล้วย่อ/ขยายเนื้อหาให้พอดีพื้นที่ A4 แนวนอน จากนั้นสั่งพิมพ์
+  async function printSheet(title, bodyHtml, cls) {
+    const cfg = window.SC_CONFIG || {};
+    let box = $('#printSheet');
+    if (!box) { box = document.createElement('div'); box.id = 'printSheet'; document.body.append(box); }
+    box.className = cls;
+    box.innerHTML = `<div class="ps-page">
+      <header class="ps-head"><img src="assets/logo.png" alt=""><div><h1>${esc(title)}</h1><p>${esc(cfg.SCHOOL_NAME || '')}</p></div></header>
+      <div class="ps-body"><div class="ps-fit">${bodyHtml}</div></div></div>`;
+    try { await document.fonts.ready; } catch (_) { /* ไม่รองรับ */ }
+    const body = $('.ps-body', box), fit = $('.ps-fit', box);
+    const W = body.clientWidth, H = body.clientHeight;
+    // ลองความกว้างหลายค่า (กว้างขึ้น = ฝ่ายงานเรียงได้หลายคอลัมน์ แต่ตัวหนังสือเล็กลง) แล้วเลือกค่าที่ได้ตัวอักษรใหญ่สุด
+    const cap = cls === 'ps-teach' ? 1.6 : 1.3;
+    let best = { z: 0, w: W };
+    for (let w = W * 0.75; w <= W * 2.2; w += W * 0.05) {
+      fit.style.width = Math.floor(w) + 'px';
+      const z = Math.min(cap, W / Math.max(w, fit.scrollWidth), H / fit.scrollHeight);
+      if (z > best.z + 0.001) best = { z, w };
+    }
+    fit.style.width = Math.floor(best.w) + 'px';
+    fit.style.zoom = best.z;
+    const page = document.createElement('style');
+    page.textContent = '@page { size: A4 landscape; margin: 8mm; }';
+    document.head.append(page);
+    document.body.classList.add('print-sheet');
+    const done = () => { document.body.classList.remove('print-sheet'); page.remove(); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(() => window.print(), 200);
   }
 
   /* ================= ครูที่ปรึกษา ================= */
