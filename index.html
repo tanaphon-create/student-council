@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
-  <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บในแต่ละครั้ง -->
+  <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บ และเมื่อกดหน้าแรก -->
   <div id="intro" class="intro" role="presentation">
     <div class="intro-glow"></div>
     <div class="intro-center">
@@ -29,24 +29,33 @@
   </div>
   <script>
     (function () {
-      var el = document.getElementById('intro'), h = location.hash.replace('#', ''), seen = false;
-      try { seen = sessionStorage.getItem('sc_intro') === '1'; sessionStorage.setItem('sc_intro', '1'); } catch (e) { /* ไม่มี storage */ }
-      // ไม่ขึ้นซ้ำในการเปิดครั้งเดียวกัน และไม่ขึ้นเมื่อเปิดลิงก์ตรงไปหน้าอื่น (เช่น ลิงก์โหวตที่แชร์กัน)
-      if (seen || (h && h !== 'home')) { el.remove(); return; }
-      document.documentElement.classList.add('intro-on');
-      var done = false;
-      function close() {
-        if (done) return;
-        done = true;
-        el.classList.add('out');
-        setTimeout(function () {
-          el.remove();
-          document.documentElement.classList.remove('intro-on');
-          document.dispatchEvent(new Event('sc:intro-done'));
-        }, 650);
+      var tpl = document.getElementById('intro'), root = document.documentElement, h = location.hash.replace('#', ''), seen = false;
+      tpl.remove(); // เก็บต้นแบบไว้ เล่นซ้ำได้ทุกครั้งด้วยสำเนาใหม่
+      function play() {
+        var el = tpl.cloneNode(true), done = false;
+        document.body.prepend(el);
+        root.classList.add('intro-on');
+        function close() {
+          if (done) return;
+          done = true;
+          el.classList.add('out');
+          setTimeout(function () {
+            el.remove();
+            root.classList.remove('intro-on');
+            document.dispatchEvent(new Event('sc:intro-done'));
+          }, 650);
+        }
+        el.addEventListener('click', close);
+        setTimeout(close, matchMedia('(prefers-reduced-motion: reduce)').matches ? 1600 : 3200);
       }
-      el.addEventListener('click', close);
-      setTimeout(close, matchMedia('(prefers-reduced-motion: reduce)').matches ? 1600 : 3200);
+      // กดลิงก์ "หน้าแรก" หรือตราสภาที่แถบบน → เล่น INTRO อีกครั้ง
+      document.addEventListener('click', function (e) {
+        if (e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        if (e.target.closest('a[href="#home"]') && !document.getElementById('intro')) play();
+      });
+      try { seen = sessionStorage.getItem('sc_intro') === '1'; sessionStorage.setItem('sc_intro', '1'); } catch (e) { /* ไม่มี storage */ }
+      // ไม่ขึ้นซ้ำเมื่อรีเฟรช และไม่ขึ้นเมื่อเปิดลิงก์ตรงไปหน้าอื่น (เช่น ลิงก์โหวตที่แชร์กัน)
+      if (!seen && (!h || h === 'home')) play();
     })();
   </script>
 
