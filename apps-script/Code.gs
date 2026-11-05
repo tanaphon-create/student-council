@@ -33,11 +33,13 @@ const SHEET_CODES = 'VoteCodes';
 const SHEET_FEEDBACK = 'Feedback';
 const SHEET_PHOTOS = 'Photos';
 const SHEET_ADVISORS = 'Advisors';
+const SHEET_ALBUMS = 'Albums';
+const SHEET_GPHOTOS = 'GalleryPhotos';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
 // perms: สิทธิ์คั่นด้วยจุลภาค finance = บันทึกบัญชี, attendance = หัวหน้าเช็คชื่อ,
-// calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู), feedback = ตอบรับความคิดเห็น — admin ได้ทุกสิทธิ์
+// calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู), feedback = ตอบรับความคิดเห็น, gallery = คลังภาพ — admin ได้ทุกสิทธิ์
 const USER_HEADERS = ['username', 'name', 'position', 'role', 'salt', 'hash', 'active', 'createdAt', 'perms'];
 const MEMBER_HEADERS = ['id', 'name', 'classroom', 'position', 'active', 'createdAt', 'studentId'];
 const DUTY_HEADERS = ['id', 'title', 'detail', 'startDate', 'endDate', 'days', 'timeStart', 'timeEnd',
@@ -66,6 +68,11 @@ const FEEDBACK_PER_HOUR = 5;
 // รูปกรรมการ: เว็บย่อเป็นรูปจัตุรัสเล็กแล้วส่งมาเป็น data URL เก็บในชีต (ช่องละไม่เกิน 50,000 ตัวอักษร)
 const PHOTO_HEADERS = ['memberId', 'data', 'updatedByName', 'updatedAt'];
 const PHOTO_MAX = 45000;
+// คลังภาพ: ไฟล์รูปเก็บใน Google Drive (คลังภาพสภานักเรียน / ปี พ.ศ. / วันที่ ชื่อกิจกรรม) ส่วนชีตเก็บรูปย่อไว้แสดงเร็ว
+const ALBUM_HEADERS = ['id', 'title', 'date', 'detail', 'folderId', 'status', 'createdByName', 'createdAt', 'updatedAt'];
+const GPHOTO_HEADERS = ['id', 'albumId', 'fileId', 'thumb', 'public', 'createdByName', 'createdAt'];
+const GALLERY_ROOT_NAME = 'คลังภาพสภานักเรียน';
+const GALLERY_MAX_BYTES = 8 * 1024 * 1024;
 // ครูที่ปรึกษา: แยกจากรายชื่อนักเรียน (ไม่เข้าระบบเช็คชื่อ) แสดงบนสุดของทำเนียบ
 const ADVISOR_HEADERS = ['id', 'name', 'position', 'sort', 'active', 'updatedByName', 'updatedAt'];
 
@@ -96,6 +103,9 @@ function setup() {
   ensure(SHEET_FEEDBACK, FEEDBACK_HEADERS, true);
   ensure(SHEET_PHOTOS, PHOTO_HEADERS, true);
   ensure(SHEET_ADVISORS, ADVISOR_HEADERS, true);
+  ensure(SHEET_ALBUMS, ALBUM_HEADERS, true);
+  ensure(SHEET_GPHOTOS, GPHOTO_HEADERS, true);
+  galleryRoot_(); // สร้างโฟลเดอร์คลังภาพใน Drive (ครั้งแรกจะขอสิทธิ์เข้าถึง Drive)
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -115,6 +125,9 @@ function doGet(e) {
     if (action === 'feedback') return json_({ ok: true, data: publicFeedback_() });
     if (action === 'photos') return json_({ ok: true, data: listPhotos_() });
     if (action === 'advisors') return json_({ ok: true, data: listAdvisors_() });
+    if (action === 'albums') return json_({ ok: true, data: listAlbums_() });
+    if (action === 'album') return json_({ ok: true, data: getAlbum_(e.parameter.id) });
+    if (action === 'gphoto') return json_({ ok: true, data: galleryPhotoData_(e.parameter.id) });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -135,6 +148,8 @@ function doPost(e) {
       genVoteCodes: genVoteCodes_, listVoteCodes: listVoteCodes_,
       setMemberPhoto: setMemberPhoto_, saveAdvisor: saveAdvisor_, deleteAdvisor: deleteAdvisor_,
       submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
+      saveAlbum: saveAlbum_, deleteAlbum: deleteAlbum_, uploadGalleryPhoto: uploadGalleryPhoto_,
+      deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_,
     };
     const fn = handlers[body.action];
     if (!fn) throw new Error('ไม่รู้จักคำสั่ง');
@@ -315,7 +330,7 @@ function requireSession_(token, need) {
 
 // ผู้ใช้เก่าที่ยังไม่มีคอลัมน์ perms และเป็น member ถือว่าบันทึกบัญชีได้ตามเดิม
 function permsOf_(u) {
-  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback'];
+  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback', 'gallery'];
   const p = String(u.perms || '').trim();
   return p ? p.split(',').filter(x => x) : ['finance'];
 }
@@ -326,7 +341,7 @@ function hasPerm_(u, need) {
 }
 
 function cleanPerms_(perms) {
-  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback'].indexOf(p) >= 0);
+  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback', 'gallery'].indexOf(p) >= 0);
   return list.length ? list.join(',') : 'none';
 }
 
@@ -985,4 +1000,152 @@ function resetAdminPassword() {
   sheet_(SHEET_USERS).getRange(found.row, USER_HEADERS.indexOf('active') + 1).setValue(true);
   CacheService.getScriptCache().remove('fail_' + ADMIN_USERNAME);
   Logger.log('ตั้งรหัสผ่านของ ' + ADMIN_USERNAME + ' ใหม่เรียบร้อย');
+}
+
+/* ---------- คลังภาพ ---------- */
+function galleryRoot_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('GALLERY_ROOT');
+  if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (_) { /* ถูกลบ สร้างใหม่ */ } }
+  const f = DriveApp.createFolder(GALLERY_ROOT_NAME);
+  props.setProperty('GALLERY_ROOT', f.getId());
+  return f;
+}
+
+function childFolder_(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+// โฟลเดอร์ปี พ.ศ. ของวันที่กิจกรรม
+const beYear_ = (date) => String(Number(String(date).slice(0, 4)) + 543);
+const albumFolderName_ = (a) => `${a.date} ${a.title}`.replace(/[\/\\]/g, '-');
+
+const albumOut_ = (a) => ({ id: str_(a.id), title: str_(a.title), date: str_(a.date), detail: str_(a.detail), folderId: str_(a.folderId) });
+const gphotoOut_ = (p) => ({ id: str_(p.id), fileId: str_(p.fileId), thumb: str_(p.thumb), public: str_(p.public) === 'true' });
+
+function listAlbums_() {
+  const photos = readRows_(SHEET_GPHOTOS, GPHOTO_HEADERS);
+  const count = {}, cover = {};
+  photos.forEach(p => {
+    const id = str_(p.albumId);
+    count[id] = (count[id] || 0) + 1;
+    if (!cover[id] && str_(p.thumb)) cover[id] = str_(p.thumb);
+  });
+  return readRows_(SHEET_ALBUMS, ALBUM_HEADERS).filter(a => str_(a.status) !== 'deleted')
+    .map(a => Object.assign(albumOut_(a), { count: count[str_(a.id)] || 0, cover: cover[str_(a.id)] || '' }));
+}
+
+function findAlbum_(id) {
+  const a = readRows_(SHEET_ALBUMS, ALBUM_HEADERS).filter(x => str_(x.id) === String(id) && str_(x.status) !== 'deleted')[0];
+  if (!a) throw new Error('ไม่พบอัลบั้ม');
+  return albumOut_(a);
+}
+
+function getAlbum_(id) {
+  const album = findAlbum_(id);
+  album.photos = readRows_(SHEET_GPHOTOS, GPHOTO_HEADERS).filter(p => str_(p.albumId) === album.id).map(gphotoOut_);
+  return album;
+}
+
+// รูปขนาดเต็มสำหรับดู/ดาวน์โหลด — เฉพาะไฟล์ที่ลงทะเบียนในคลังภาพเท่านั้น
+function galleryPhotoData_(id) {
+  const p = readRows_(SHEET_GPHOTOS, GPHOTO_HEADERS).filter(x => str_(x.id) === String(id))[0];
+  if (!p) throw new Error('ไม่พบรูป');
+  const blob = DriveApp.getFileById(str_(p.fileId)).getBlob();
+  if (blob.getBytes().length > 15 * 1024 * 1024) throw new Error('ไฟล์ใหญ่เกินกว่าจะแสดงบนเว็บ กรุณาเปิดใน Google Drive');
+  return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+}
+
+function saveAlbum_(b) {
+  const user = requireSession_(b.token, 'gallery');
+  const title = clean_(b.title, 120);
+  if (!title) throw new Error('กรุณาระบุชื่อกิจกรรม');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || '')) throw new Error('วันที่ไม่ถูกต้อง');
+  const v = { title, date: b.date, detail: clean_(b.detail, 1000), updatedAt: new Date().toISOString() };
+  const sheet = sheet_(SHEET_ALBUMS);
+  if (b.id) {
+    const cur = findAlbum_(b.id);
+    const row = findRow_(SHEET_ALBUMS, b.id);
+    const folder = DriveApp.getFolderById(cur.folderId);
+    folder.setName(albumFolderName_(v));
+    if (beYear_(cur.date) !== beYear_(v.date)) folder.moveTo(childFolder_(galleryRoot_(), beYear_(v.date)));
+    const old = sheet.getRange(row, 1, 1, ALBUM_HEADERS.length).getValues()[0];
+    sheet.getRange(row, 1, 1, ALBUM_HEADERS.length).setValues([ALBUM_HEADERS.map((h, i) => h in v ? v[h] : old[i])]);
+    return { id: cur.id };
+  }
+  const folder = childFolder_(childFolder_(galleryRoot_(), beYear_(v.date)), albumFolderName_(v));
+  const id = Utilities.getUuid();
+  Object.assign(v, { id, folderId: folder.getId(), status: 'active', createdByName: user.name, createdAt: v.updatedAt });
+  sheet.appendRow(ALBUM_HEADERS.map(h => v[h]));
+  return { id };
+}
+
+// ลบอัลบั้ม: ย้ายโฟลเดอร์ไปถังขยะของ Drive (กู้คืนได้ภายใน 30 วัน)
+function deleteAlbum_(b) {
+  requireSession_(b.token, 'gallery');
+  const a = findAlbum_(b.id);
+  sheet_(SHEET_ALBUMS).getRange(findRow_(SHEET_ALBUMS, a.id), ALBUM_HEADERS.indexOf('status') + 1).setValue('deleted');
+  try { DriveApp.getFolderById(a.folderId).setTrashed(true); } catch (_) { /* โฟลเดอร์ถูกลบไปแล้ว */ }
+  return true;
+}
+
+// พยายามเปิดลิงก์ให้ทุกคนดูได้ — ถ้าโดเมนโรงเรียนไม่อนุญาต เว็บจะดึงรูปผ่านสคริปต์แทน
+function shareFile_(file) {
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); return 'true'; } catch (_) { return 'false'; }
+}
+
+function cleanThumb_(t) {
+  const thumb = String(t || '');
+  if (thumb && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(thumb) || thumb.length > PHOTO_MAX)) throw new Error('รูปย่อไม่ถูกต้อง');
+  return thumb;
+}
+
+// อัปโหลดทีละรูป: data = base64 ของ JPEG ที่ย่อแล้ว, thumb = รูปย่อ (data URL)
+function uploadGalleryPhoto_(b) {
+  const user = requireSession_(b.token, 'gallery');
+  const a = findAlbum_(b.albumId);
+  const data = String(b.data || '');
+  if (!/^[A-Za-z0-9+\/=]+$/.test(data)) throw new Error('ไฟล์รูปไม่ถูกต้อง');
+  const bytes = Utilities.base64Decode(data);
+  if (bytes.length > GALLERY_MAX_BYTES) throw new Error('ไฟล์รูปใหญ่เกินไป');
+  const name = clean_(b.name, 100).replace(/\.[^.]*$/, '') || 'photo';
+  const file = DriveApp.getFolderById(a.folderId).createFile(Utilities.newBlob(bytes, 'image/jpeg', name + '.jpg'));
+  const row = { id: Utilities.getUuid(), albumId: a.id, fileId: file.getId(), thumb: cleanThumb_(b.thumb), public: shareFile_(file),
+    createdByName: user.name, createdAt: new Date().toISOString() };
+  sheet_(SHEET_GPHOTOS).appendRow(GPHOTO_HEADERS.map(h => row[h]));
+  return gphotoOut_(row);
+}
+
+function deleteGalleryPhoto_(b) {
+  requireSession_(b.token, 'gallery');
+  const row = findRow_(SHEET_GPHOTOS, b.id);
+  const sheet = sheet_(SHEET_GPHOTOS);
+  const fileId = String(sheet.getRange(row, GPHOTO_HEADERS.indexOf('fileId') + 1).getValue());
+  try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) { /* ไฟล์ถูกลบไปแล้ว */ }
+  sheet.deleteRow(row);
+  return true;
+}
+
+// รูปที่ใส่ในโฟลเดอร์ Drive โดยตรง → ลงทะเบียนเข้าคลังภาพ (เว็บจะสร้างรูปย่อให้ภายหลัง)
+function syncAlbum_(b) {
+  const user = requireSession_(b.token, 'gallery');
+  const a = findAlbum_(b.id);
+  const have = {};
+  readRows_(SHEET_GPHOTOS, GPHOTO_HEADERS).forEach(p => { have[str_(p.fileId)] = true; });
+  const files = DriveApp.getFolderById(a.folderId).getFiles(), rows = [], now = new Date().toISOString();
+  while (files.hasNext() && rows.length < 200) {
+    const f = files.next();
+    if (have[f.getId()] || !/^image\//.test(f.getMimeType())) continue;
+    rows.push([Utilities.getUuid(), a.id, f.getId(), '', shareFile_(f), user.name, now]);
+  }
+  if (rows.length) { const s = sheet_(SHEET_GPHOTOS); s.getRange(s.getLastRow() + 1, 1, rows.length, GPHOTO_HEADERS.length).setValues(rows); }
+  return { added: rows.length };
+}
+
+function setGalleryThumb_(b) {
+  requireSession_(b.token, 'gallery');
+  const row = findRow_(SHEET_GPHOTOS, b.id);
+  sheet_(SHEET_GPHOTOS).getRange(row, GPHOTO_HEADERS.indexOf('thumb') + 1).setValue(cleanThumb_(b.thumb));
+  return true;
 }

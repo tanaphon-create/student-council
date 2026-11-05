@@ -852,3 +852,50 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .slip-code { font: 700 24px 'Prompt'; letter-spacing: .18em; }
   .slip-url { word-break: break-all; color: #444; }
 }
+
+/* ================= คลังภาพ ================= */
+.gal-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+.gal-tools input[type=search] { flex: 1 1 220px; }
+.gal-tools select { width: auto; }
+.gal-years { flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.gal-years button { border: 1px solid var(--line, #dfe5e1); background: #fff; border-radius: 999px; padding: 6px 14px; font: 500 14px 'Prompt', sans-serif; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.gal-years button.on { background: var(--green-700); border-color: var(--green-700); color: #fff; }
+.gal-month { margin: 22px 0 10px; font-size: 17px; color: var(--green-700); }
+.gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.gal-card { display: block; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 10px rgba(16, 60, 36, .08); color: inherit; text-decoration: none; transition: transform .18s, box-shadow .18s; }
+.gal-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(16, 60, 36, .14); }
+.gal-cover { position: relative; aspect-ratio: 4 / 3; background: #eef3ef; display: grid; place-items: center; font-size: 40px; }
+.gal-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gal-count { position: absolute; right: 8px; bottom: 8px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+.gal-cap { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 2px; }
+.gal-cap b { font-size: 15px; line-height: 1.35; }
+.gal-cap small { color: var(--muted); }
+.gal-head { margin-bottom: 16px; }
+.gal-head h2 { margin: 2px 0 0; }
+.eyebrow-sm { margin: 0; color: var(--muted); font-size: 14px; }
+.gal-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--green-700); }
+.gal-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.gal-ph { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: #e8eee9; cursor: zoom-in; }
+.gal-ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s; }
+.gal-ph:hover img { transform: scale(1.05); }
+.gal-wait { font-size: 12px; color: var(--muted); padding: 6px; }
+html.lb-on, html.lb-on body { overflow: hidden; }
+.gal-lb { position: fixed; inset: 0; z-index: 300; background: rgba(8, 14, 10, .97); display: flex; align-items: center; justify-content: center; }
+.lb-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 12px 16px; color: #fff; font-size: 14px; z-index: 2; }
+.lb-top .spacer { flex: 1; }
+.lb-btn { background: rgba(255, 255, 255, .12); color: #fff; border: 0; border-radius: 999px; padding: 7px 14px; font: 500 14px 'Prompt', sans-serif; cursor: pointer; text-decoration: none; }
+.lb-btn:hover { background: rgba(255, 255, 255, .22); }
+.lb-fig { margin: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 60px 64px; position: relative; }
+.lb-img, .lb-low { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+.lb-low { filter: blur(2px); opacity: .7; }
+.lb-load { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 13px; background: rgba(0, 0, 0, .5); padding: 4px 12px; border-radius: 999px; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-size: 30px; line-height: 1; cursor: pointer; z-index: 2; }
+.lb-nav:hover { background: rgba(255, 255, 255, .26); }
+.lb-nav.prev { left: 12px; } .lb-nav.next { right: 12px; }
+@media (max-width: 640px) {
+  .gal-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .gal-photos { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .gal-ph { border-radius: 6px; }
+  .lb-fig { padding: 56px 8px; }
+  .lb-nav { width: 40px; height: 40px; font-size: 24px; background: rgba(0, 0, 0, .35); }
+}

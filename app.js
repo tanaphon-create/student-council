@@ -8,18 +8,23 @@
   const state = { tx: [], session: loadSession(), users: [] };
 
   /* ================= API ================= */
-  async function apiGet(action) {
-    if (DEMO) return demo.call({ action });
-    const res = await fetch(`${CFG.API_URL}?action=${action}`);
+  // params: ค่าเพิ่มเติมใน query เช่น { id } — opt.cache = false สำหรับข้อมูลใหญ่ที่ไม่ควรจำไว้ในเครื่อง
+  async function apiGet(action, params = {}, opt = {}) {
+    if (DEMO) return demo.call({ action, ...params });
+    const qs = Object.entries(params).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
+    const res = await fetch(`${CFG.API_URL}?action=${action}${qs}`);
     const data = unwrap(await res.json());
-    try { const t = JSON.stringify(data); if (t.length < 1.5e6) localStorage.setItem(CACHE + action, t); } catch (_) { /* เต็มหรือไม่มี storage */ }
+    if (opt.cache !== false) {
+      try { const t = JSON.stringify(data); if (t.length < 1.5e6) localStorage.setItem(CACHE + action + qs, t); } catch (_) { /* เต็มหรือไม่มี storage */ }
+    }
     return data;
   }
   // ข้อมูลสาธารณะชุดล่าสุดที่เคยโหลด — ใช้แสดงทันทีระหว่างรอ Apps Script (ช้า ~2 วิ)
   const CACHE = 'sc_cache_';
-  function fromCache(action) {
+  function fromCache(action, params = {}) {
     let v = null;
-    try { if (!DEMO) v = JSON.parse(localStorage.getItem(CACHE + action)); } catch (_) { /* ไม่มี storage */ }
+    const qs = Object.entries(params).map(([k, x]) => `&${k}=${encodeURIComponent(x)}`).join('');
+    try { if (!DEMO) v = JSON.parse(localStorage.getItem(CACHE + action + qs)); } catch (_) { /* ไม่มี storage */ }
     if (v == null) throw new Error('NO_CACHE');
     return v;
   }
@@ -57,7 +62,7 @@
         users: [
           { username: 'admin', name: 'ผู้ดูแลระบบ', position: 'ครูที่ปรึกษาสภา', role: 'admin', perms: [], password: 'admin1234', active: true },
           { username: 'treasurer', name: 'นางสาวตัวอย่าง ใจดี', position: 'เหรัญญิก', role: 'member', perms: ['finance'], password: 'demo1234', active: true },
-          { username: 'president', name: 'นายภูมิพัฒน์ ศรีสุข', position: 'ประธานนักเรียน', role: 'member', perms: ['calendar', 'attendance', 'feedback'], password: 'demo1234', active: true },
+          { username: 'president', name: 'นายภูมิพัฒน์ ศรีสุข', position: 'ประธานนักเรียน', role: 'member', perms: ['calendar', 'attendance', 'feedback', 'gallery'], password: 'demo1234', active: true },
           { username: 'leader', name: 'นายหัวหน้า ตัวอย่าง', position: 'หัวหน้าฝ่ายปฏิบัติงาน', role: 'member', perms: ['attendance'], password: 'demo1234', active: true },
         ],
         tx: [], sessions: {},
@@ -169,7 +174,7 @@
 
   /* ================= สิทธิ์ ================= */
   // finance = บันทึกบัญชี, attendance = หัวหน้าเช็คชื่อ, calendar = บันทึกปฏิทินงาน, admin ได้ทุกสิทธิ์
-  const PERM_LABELS = { finance: 'บันทึกบัญชี', attendance: 'หัวหน้าเช็คชื่อ', calendar: 'บันทึกปฏิทินงาน', feedback: 'ตอบรับความคิดเห็น' };
+  const PERM_LABELS = { finance: 'บันทึกบัญชี', attendance: 'หัวหน้าเช็คชื่อ', calendar: 'บันทึกปฏิทินงาน', feedback: 'ตอบรับความคิดเห็น', gallery: 'คลังภาพ' };
   function permsOf(u) {
     if (u.role === 'admin') return Object.keys(PERM_LABELS);
     return Array.isArray(u.perms) ? u.perms.filter(p => p !== 'none') : ['finance'];
@@ -534,6 +539,7 @@
         <label class="chk"><input type="checkbox" name="pf" value="attendance" ${has('attendance')}> หัวหน้าเช็คชื่อปฏิบัติงาน</label>
         <label class="chk"><input type="checkbox" name="pf" value="calendar" ${has('calendar')}> บันทึกปฏิทินงาน (ประธานนักเรียน / ครู)</label>
         <label class="chk"><input type="checkbox" name="pf" value="feedback" ${has('feedback')}> ตอบรับความคิดเห็น (อ่านและตอบเรื่องที่นักเรียนส่งมา)</label>
+        <label class="chk"><input type="checkbox" name="pf" value="gallery" ${has('gallery')}> คลังภาพ (สร้างอัลบั้มกิจกรรม อัปโหลดและลบรูป)</label>
         <label class="chk"><input type="checkbox" name="isAdmin" ${u.role === 'admin' ? 'checked' : ''}> ผู้ดูแลระบบ (ทำได้ทุกอย่าง)</label>
       </div></div>`;
   }
@@ -567,7 +573,7 @@
   /* ================= router ================= */
   function route() {
     let [r, param] = (location.hash || '#home').slice(1).split('/');
-    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee'].includes(r)) r = 'home';
+    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee', 'gallery'].includes(r)) r = 'home';
     if (r === 'members' && !isAdmin()) r = 'finance';
     const page = r === 'calendar' ? 'home' : r; // ปฏิทินอยู่ในหน้าแรก
     $$('.page').forEach(p => (p.hidden = p.id !== 'page-' + page));
@@ -577,6 +583,7 @@
     if (r === 'vote') document.dispatchEvent(new CustomEvent('sc:vote', { detail: param || '' }));
     if (r === 'feedback') document.dispatchEvent(new CustomEvent('sc:feedback', { detail: param || '' }));
     if (r === 'committee') document.dispatchEvent(new CustomEvent('sc:committee', { detail: param || '' }));
+    if (r === 'gallery') document.dispatchEvent(new CustomEvent('sc:gallery', { detail: param || '' }));
     window.scrollTo(0, 0);
     if (page === 'home') document.dispatchEvent(new CustomEvent('sc:home', { detail: { scroll: r === 'calendar' } }));
   }
