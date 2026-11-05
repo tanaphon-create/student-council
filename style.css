@@ -128,8 +128,8 @@ img { max-width: 100%; display: block; }
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .0) 42%, rgba(255, 250, 225, .75) 50%, rgba(255, 255, 255, 0) 58%, transparent 62%) no-repeat;
   background-size: 250% 100%; background-position: 150% 0;
-  -webkit-mask: url(assets/logo.png) center / contain no-repeat;
-          mask: url(assets/logo.png) center / contain no-repeat;
+  -webkit-mask: url(assets/logo.png?v=2) center / contain no-repeat;
+          mask: url(assets/logo.png?v=2) center / contain no-repeat;
   mix-blend-mode: screen;
   animation: sweep 5s ease-in-out 1s infinite;
 }
@@ -760,7 +760,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(115deg, transparent 38%, rgba(255, 250, 225, .85) 50%, transparent 62%) no-repeat;
   background-size: 250% 100%; background-position: 150% 0;
-  -webkit-mask: url(assets/logo.png) center / contain no-repeat; mask: url(assets/logo.png) center / contain no-repeat;
+  -webkit-mask: url(assets/logo.png?v=2) center / contain no-repeat; mask: url(assets/logo.png?v=2) center / contain no-repeat;
   mix-blend-mode: screen; animation: introSweep 1.3s ease-in-out .95s both;
 }
 .intro-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(242, 214, 117, .75); animation: introRing 1.8s ease-out .45s both; }

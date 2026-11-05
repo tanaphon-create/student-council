@@ -29,14 +29,15 @@
   }
   const votedHere = (p) => p.voterMode === 'device' && store.get('sc_voted_' + p.id) === '1';
 
-  async function load() {
-    vs.polls = isAdmin() ? await SC.authed({ action: 'adminPolls' }) : await SC.apiGet('polls');
+  async function load(get = SC.apiGet) {
+    vs.polls = isAdmin() ? await SC.authed({ action: 'adminPolls' }) : await get('polls');
     vs.loaded = true;
   }
 
   /* ================= เส้นทาง ================= */
   document.addEventListener('sc:vote', async (e) => {
     vs.view = e.detail || '';
+    if (!vs.loaded && !isAdmin()) await SC.prime(load);
     if (vs.loaded) render(); else $('#voteView').innerHTML = '<p class="empty">กำลังโหลดข้อมูล…</p>';
     try { await load(); render(); } catch (err) {
       if (!vs.loaded) $('#voteView').innerHTML = `<p class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(err.message)}</p>`; else toast(err.message, true);
@@ -48,14 +49,16 @@
   // แถบ "กำลังเปิดโหวต" ในหน้าแรก
   document.addEventListener('sc:home', async () => {
     const box = $('#homePolls');
-    try {
-      const open = (await SC.apiGet('polls')).filter(p => p.status === 'open');
+    const show = (polls) => {
+      const open = polls.filter(p => p.status === 'open');
       box.hidden = !open.length;
       box.innerHTML = open.map(p => `<a class="poll-strip" href="#vote/${esc(p.id)}">
         <span class="ps-icon" aria-hidden="true">🗳️</span>
         <span class="ps-text"><small>กำลังเปิดโหวต${p.closeAt ? ' · ปิด ' + closeText(p.closeAt) : ''}</small><b>${esc(p.title)}</b></span>
         <span class="ps-go">${votedHere(p) ? 'ดูผล' : 'โหวตเลย'} →</span></a>`).join('');
-    } catch (_) { box.hidden = true; }
+    };
+    const shown = await SC.prime(async (get) => show(await get('polls')));
+    try { show(await SC.apiGet('polls')); } catch (_) { if (!shown) box.hidden = true; }
   });
 
   function render() {
@@ -243,7 +246,7 @@
       let box = $('#printCodes');
       if (!box) { box = document.createElement('div'); box.id = 'printCodes'; document.body.append(box); }
       box.innerHTML = codes.map(c => `<div class="slip">
-        <div class="slip-head"><img src="assets/logo.png" alt=""><span>สภานักเรียน โรงเรียนวังจันทร์วิทยา</span></div>
+        <div class="slip-head"><img src="assets/logo.png?v=2" alt=""><span>สภานักเรียน โรงเรียนวังจันทร์วิทยา</span></div>
         <b class="slip-title">${esc(p.title)}</b>
         <span class="slip-label">รหัสโหวต</span><span class="slip-code">${esc(c.code)}</span>
         <small class="slip-url">${esc(url)}</small><small>ใช้ได้ 1 ครั้ง ห้ามให้ผู้อื่น</small></div>`).join('');

@@ -11,8 +11,20 @@
   async function apiGet(action) {
     if (DEMO) return demo.call({ action });
     const res = await fetch(`${CFG.API_URL}?action=${action}`);
-    return unwrap(await res.json());
+    const data = unwrap(await res.json());
+    try { const t = JSON.stringify(data); if (t.length < 1.5e6) localStorage.setItem(CACHE + action, t); } catch (_) { /* เต็มหรือไม่มี storage */ }
+    return data;
   }
+  // ข้อมูลสาธารณะชุดล่าสุดที่เคยโหลด — ใช้แสดงทันทีระหว่างรอ Apps Script (ช้า ~2 วิ)
+  const CACHE = 'sc_cache_';
+  function fromCache(action) {
+    let v = null;
+    try { if (!DEMO) v = JSON.parse(localStorage.getItem(CACHE + action)); } catch (_) { /* ไม่มี storage */ }
+    if (v == null) throw new Error('NO_CACHE');
+    return v;
+  }
+  // เรียก load(get) ด้วยข้อมูลในเครื่อง — คืน true ถ้ามีครบทุกชุด
+  const prime = async (load) => { try { await load(fromCache); return true; } catch (_) { return false; } };
   async function apiPost(payload) {
     if (DEMO) return demo.call(payload);
     // text/plain หลีกเลี่ยง CORS preflight ที่ Apps Script ไม่รองรับ
@@ -203,7 +215,7 @@
     if (f) f.focus();
   }
   dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
-  const dlgHead = (title, extra = '') => `<div class="dlg-head ${extra}"><img src="assets/logo.png" alt=""><h2>${title}</h2><button class="dlg-x" data-close aria-label="ปิด">×</button></div>`;
+  const dlgHead = (title, extra = '') => `<div class="dlg-head ${extra}"><img src="assets/logo.png?v=2" alt=""><h2>${title}</h2><button class="dlg-x" data-close aria-label="ปิด">×</button></div>`;
 
   async function submitting(form, fn) {
     const btn = $('button[type=submit]', form), err = $('.err', form);
@@ -279,11 +291,13 @@
   const totals = () => active().reduce((o, t) => { o[t.type] += t.amount; return o; }, { in: 0, out: 0 });
 
   async function loadTx() {
-    $('#ledgerBody').innerHTML = Array.from({ length: 4 }, () => '<tr class="skeleton">' + '<td>&nbsp;</td>'.repeat(7) + '</tr>').join('');
+    const shown = await prime(async (get) => { state.tx = (await get('list')).sort(sortTx); renderAll(); });
+    if (!shown) $('#ledgerBody').innerHTML = Array.from({ length: 4 }, () => '<tr class="skeleton">' + '<td>&nbsp;</td>'.repeat(7) + '</tr>').join('');
     try {
       state.tx = (await apiGet('list')).sort(sortTx);
       renderAll();
     } catch (e) {
+      if (shown) { toast('โหลดข้อมูลล่าสุดไม่สำเร็จ: ' + e.message, true); return; }
       $('#ledgerBody').innerHTML = '';
       $('#ledgerEmpty').hidden = false;
       $('#ledgerEmpty').textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + e.message;
@@ -569,7 +583,7 @@
   window.addEventListener('hashchange', route);
 
   // ให้โมดูลอื่น (เช่น duty.js) ใช้ตัวช่วยร่วมกัน
-  window.SC = { $, $$, state, apiGet, apiPost, authed, can, esc, toast, openDialog, dlgHead, submitting, iso, uid, thDate, thDateLong, demoExt: demo.ext, isDemo: DEMO, dialog: dlg };
+  window.SC = { $, $$, state, apiGet, prime, apiPost, authed, can, esc, toast, openDialog, dlgHead, submitting, iso, uid, thDate, thDateLong, demoExt: demo.ext, isDemo: DEMO, dialog: dlg };
 
   document.addEventListener('DOMContentLoaded', () => {
     $$('[data-year]').forEach(el => (el.textContent = CFG.ACADEMIC_YEAR || ''));

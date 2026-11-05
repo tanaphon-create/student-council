@@ -22,8 +22,8 @@
   const longDate = (s) => parse(s).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const timeText = (it) => it.timeStart ? `${it.timeStart}${it.timeEnd ? '–' + it.timeEnd : ''} น.` : 'ทั้งวัน';
 
-  async function load() {
-    const [events, duty] = await Promise.all([SC.apiGet('events'), SC.apiGet('duty')]);
+  async function load(get = SC.apiGet) {
+    const [events, duty] = await Promise.all([get('events'), get('duty')]);
     cs.events = events;
     cs.duties = duty.duties;
     cs.loaded = true;
@@ -42,6 +42,7 @@
   /* ================= เส้นทาง ================= */
   document.addEventListener('sc:home', async (e) => {
     const scroll = e.detail && e.detail.scroll;
+    if (!cs.loaded) await SC.prime(load);
     if (cs.loaded) { render(); if (scroll) scrollToCal(); }
     try {
       await load();

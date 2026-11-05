@@ -20,16 +20,26 @@
 
   document.addEventListener('sc:committee', async (e) => {
     cs.mode = e.detail === 'chart' ? 'chart' : 'list';
-    if (cs.members) render(); else $('#committeeView').innerHTML = '<p class="empty">กำลังโหลดข้อมูล…</p>';
-    try {
-      const [duty, photos, advisors] = await Promise.all([SC.apiGet('duty'), SC.apiGet('photos').catch(() => ({})), SC.apiGet('advisors').catch(() => [])]);
+    if (!cs.members) await SC.prime(async (get) => {
+      const duty = get('duty');
+      try { cs.photos = get('photos'); } catch (_) { /* รูปยังไม่เคยโหลด */ }
+      try { cs.advisors = get('advisors'); } catch (_) { /* ยังไม่เคยโหลด */ }
       cs.members = duty.members.filter(m => m.active);
-      cs.advisors = advisors || [];
-      cs.photos = photos || {};
+    });
+    if (cs.members) render(); else $('#committeeView').innerHTML = '<p class="empty">กำลังโหลดข้อมูล…</p>';
+    // รายชื่อขึ้นก่อน — รูปและครูที่ปรึกษาตามมาทีหลัง (รูปเป็นชุดข้อมูลที่ใหญ่ที่สุด)
+    const photosP = SC.apiGet('photos').catch(() => null), advisorsP = SC.apiGet('advisors').catch(() => null);
+    try {
+      const duty = await SC.apiGet('duty');
+      cs.members = duty.members.filter(m => m.active);
       render();
     } catch (err) {
-      if (!cs.members) $('#committeeView').innerHTML = `<p class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(err.message)}</p>`;
+      if (!cs.members) { $('#committeeView').innerHTML = `<p class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(err.message)}</p>`; return; }
     }
+    const [photos, advisors] = await Promise.all([photosP, advisorsP]);
+    if (photos) cs.photos = photos;
+    if (advisors) cs.advisors = advisors;
+    if (photos || advisors) render();
   });
   document.addEventListener('sc:auth', () => { if (cs.members && !$('#page-committee').hidden) render(); });
 
@@ -230,7 +240,7 @@
     if (!box) { box = document.createElement('div'); box.id = 'printSheet'; document.body.append(box); }
     box.className = cls;
     box.innerHTML = `<div class="ps-page">
-      <header class="ps-head"><img src="assets/logo.png" alt=""><div><h1>${esc(title)}</h1><p>${esc(cfg.SCHOOL_NAME || '')}</p></div></header>
+      <header class="ps-head"><img src="assets/logo.png?v=2" alt=""><div><h1>${esc(title)}</h1><p>${esc(cfg.SCHOOL_NAME || '')}</p></div></header>
       <div class="ps-body"><div class="ps-fit">${bodyHtml}</div></div></div>`;
     try { await document.fonts.ready; } catch (_) { /* ไม่รองรับ */ }
     const body = $('.ps-body', box), fit = $('.ps-fit', box);

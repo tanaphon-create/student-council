@@ -56,8 +56,8 @@
     || String(a.name || '').localeCompare(String(b.name || ''), 'th');
   const orderIds = (ids) => [...ids].sort((a, b) => byRank(memberById(a) || {}, memberById(b) || {}));
 
-  async function load() {
-    const data = await SC.apiGet('duty');
+  async function load(get = SC.apiGet) {
+    const data = await get('duty');
     ds.members = [...data.members].sort(byRank);
     ds.duties = data.duties;
     ds.att = data.attendance;
@@ -94,6 +94,7 @@
     ds.date = null;
     ds.saved = '';
     const view = ds.view;
+    if (!ds.loaded) await SC.prime(load);
     if (ds.loaded) render();
     else $('#dutyView').innerHTML = '<p class="empty">กำลังโหลดข้อมูล…</p>';
     // โหลดข้อมูลล่าสุดเบื้องหลัง แต่ไม่ทับสิ่งที่หัวหน้ากำลังเช็คค้างอยู่
