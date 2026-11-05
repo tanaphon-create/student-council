@@ -367,9 +367,27 @@ function sheet_(name) {
 function readRows_(name, headers) {
   const s = sheet_(name);
   if (s.getLastRow() < 2) return [];
-  return s.getRange(2, 1, s.getLastRow() - 1, headers.length).getValues()
-    .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i]])));
+  const range = s.getRange(2, 1, s.getLastRow() - 1, headers.length);
+  // ชีตแปลง "08:00" เป็นค่าเวลา (วันที่ 1899-12-30) เอง — อ่านคอลัมน์เวลาจากข้อความที่แสดงแทน
+  const timeCols = headers.map((h, i) => /^time(Start|End)$/.test(h) ? i : -1).filter(i => i >= 0);
+  const shown = timeCols.length ? range.getDisplayValues() : null;
+  return range.getValues().map((r, k) => {
+    timeCols.forEach(i => { r[i] = hhmm_(shown[k][i]) || (r[i] instanceof Date ? Utilities.formatDate(r[i], s.getParent().getSpreadsheetTimeZone(), 'HH:mm') : ''); });
+    return Object.fromEntries(headers.map((h, i) => [h, r[i]]));
+  });
 }
+
+function hhmm_(v) {
+  const m = String(v).match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?/);
+  if (!m) return '';
+  let h = Number(m[1]);
+  if (m[3] && /p/i.test(m[3]) && h < 12) h += 12;
+  if (m[3] && /a/i.test(m[3]) && h === 12) h = 0;
+  return String(h).padStart(2, '0') + ':' + m[2];
+}
+
+// ใส่ ' นำหน้าให้ชีตเก็บเวลาเป็นข้อความ ไม่แปลงเป็นวันที่
+const timeCell_ = (t) => t ? "'" + t : '';
 
 function toIsoDate_(v) {
   if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -478,7 +496,7 @@ function saveDuty_(b) {
   const now = new Date().toISOString();
   const values = {
     title, detail: clean_(b.detail, 1000), startDate: b.startDate, endDate: b.endDate, days: days.join(','),
-    timeStart: b.timeStart || '', timeEnd: b.timeEnd || '', mode: b.mode === 'overall' ? 'overall' : 'daily',
+    timeStart: timeCell_(b.timeStart), timeEnd: timeCell_(b.timeEnd), mode: b.mode === 'overall' ? 'overall' : 'daily',
     memberIds: memberIds.join(','), status: 'active', updatedAt: now,
   };
   const sheet = sheet_(SHEET_DUTIES);
@@ -574,7 +592,7 @@ function saveEvent_(b) {
   if (!t.test(b.timeStart || '') || !t.test(b.timeEnd || '')) throw new Error('เวลาไม่ถูกต้อง');
   const now = new Date().toISOString();
   const values = {
-    title, detail: clean_(b.detail, 1000), date: b.date, endDate, timeStart: b.timeStart || '', timeEnd: b.timeEnd || '',
+    title, detail: clean_(b.detail, 1000), date: b.date, endDate, timeStart: timeCell_(b.timeStart), timeEnd: timeCell_(b.timeEnd),
     location: clean_(b.location, 150), category: EVENT_CATEGORIES.indexOf(b.category) >= 0 ? b.category : 'other',
     status: 'active', updatedByName: user.name, updatedAt: now,
   };
