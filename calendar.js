@@ -32,7 +32,8 @@
   function itemsOn(date) {
     const dow = parse(date).getDay();
     const ev = cs.events.filter(e => e.date <= date && date <= (e.endDate || e.date)).map(e => ({ ...e, kind: e.category in KINDS ? e.category : 'other', ev: true }));
-    const du = cs.duties.filter(d => d.startDate <= date && date <= d.endDate && d.days.includes(dow)).map(d => ({
+    // งานที่กดเสร็จสิ้นแล้ว ไม่แสดงในวันหลังวันที่กดเสร็จ
+    const du = cs.duties.filter(d => d.startDate <= date && date <= d.endDate && d.days.includes(dow) && !(d.status === 'done' && d.doneAt && date > d.doneAt.slice(0, 10))).map(d => ({
       id: d.id, kind: 'duty', title: d.title, detail: d.detail, timeStart: d.timeStart, timeEnd: d.timeEnd,
       location: '', createdByName: d.createdByName, members: d.memberIds.length, href: '#duty/' + d.id,
     }));

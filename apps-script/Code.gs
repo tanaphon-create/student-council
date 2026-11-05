@@ -41,7 +41,7 @@ const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
 const USER_HEADERS = ['username', 'name', 'position', 'role', 'salt', 'hash', 'active', 'createdAt', 'perms'];
 const MEMBER_HEADERS = ['id', 'name', 'classroom', 'position', 'active', 'createdAt', 'studentId'];
 const DUTY_HEADERS = ['id', 'title', 'detail', 'startDate', 'endDate', 'days', 'timeStart', 'timeEnd',
-  'mode', 'memberIds', 'status', 'createdByName', 'createdAt', 'updatedAt'];
+  'mode', 'memberIds', 'status', 'createdByName', 'createdAt', 'updatedAt', 'doneAt', 'doneByName'];
 const ATT_HEADERS = ['dutyId', 'date', 'memberId', 'status', 'note', 'checkedByName', 'checkedAt'];
 const ATT_STATUSES = ['present', 'late', 'leave', 'absent'];
 const EVENT_HEADERS = ['id', 'title', 'detail', 'date', 'endDate', 'timeStart', 'timeEnd', 'location', 'category',
@@ -129,7 +129,7 @@ function doPost(e) {
       changePassword: changePassword_, listUsers: listUsers_, addUser: addUser_,
       resetPassword: resetPassword_, setUserActive: setUserActive_, setUserPerms: setUserPerms_,
       saveMember: saveMember_, bulkAddMembers: bulkAddMembers_, setMemberActive: setMemberActive_,
-      saveDuty: saveDuty_, deleteDuty: deleteDuty_, saveAttendance: saveAttendance_,
+      saveDuty: saveDuty_, setDutyDone: setDutyDone_, deleteDuty: deleteDuty_, saveAttendance: saveAttendance_,
       saveEvent: saveEvent_, deleteEvent: deleteEvent_,
       vote: vote_, adminPolls: adminPolls_, savePoll: savePoll_, setPollStatus: setPollStatus_, deletePoll: deletePoll_,
       genVoteCodes: genVoteCodes_, listVoteCodes: listVoteCodes_,
@@ -418,6 +418,7 @@ function dutyOut_(d) {
     days: str_(d.days).split(',').filter(x => x !== '').map(Number), timeStart: str_(d.timeStart), timeEnd: str_(d.timeEnd),
     mode: str_(d.mode) || 'daily', memberIds: str_(d.memberIds).split(',').filter(x => x),
     createdByName: str_(d.createdByName), createdAt: str_(d.createdAt),
+    status: str_(d.status) === 'done' ? 'done' : 'active', doneAt: str_(d.doneAt), doneByName: str_(d.doneByName),
   };
 }
 
@@ -497,7 +498,7 @@ function saveDuty_(b) {
   const values = {
     title, detail: clean_(b.detail, 1000), startDate: b.startDate, endDate: b.endDate, days: days.join(','),
     timeStart: timeCell_(b.timeStart), timeEnd: timeCell_(b.timeEnd), mode: b.mode === 'overall' ? 'overall' : 'daily',
-    memberIds: memberIds.join(','), status: 'active', updatedAt: now,
+    memberIds: memberIds.join(','), updatedAt: now,
   };
   const sheet = sheet_(SHEET_DUTIES);
   if (b.id) {
@@ -507,9 +508,21 @@ function saveDuty_(b) {
     return { id: b.id };
   }
   const id = Utilities.getUuid();
-  Object.assign(values, { id, createdByName: user.name, createdAt: now });
+  Object.assign(values, { id, status: 'active', createdByName: user.name, createdAt: now, doneAt: '', doneByName: '' });
   sheet.appendRow(DUTY_HEADERS.map(h => values[h]));
   return { id };
+}
+
+// กดเสร็จสิ้นงาน (done = true) หรือเปิดงานอีกครั้ง (done = false)
+function setDutyDone_(b) {
+  const user = requireSession_(b.token, 'attendance');
+  const row = findRow_(SHEET_DUTIES, b.id);
+  const col = DUTY_HEADERS.indexOf('status') + 1;
+  const sheet = sheet_(SHEET_DUTIES);
+  if (String(sheet.getRange(row, col).getValue()) === 'deleted') throw new Error('ไม่พบงาน');
+  sheet.getRange(row, col).setValue(b.done ? 'done' : 'active');
+  sheet.getRange(row, DUTY_HEADERS.indexOf('doneAt') + 1, 1, 2).setValues([b.done ? [nowLocal_(), user.name] : ['', '']]);
+  return true;
 }
 
 function deleteDuty_(b) {
@@ -525,6 +538,7 @@ function saveAttendance_(b) {
   const user = requireSession_(b.token, 'attendance');
   const duty = readRows_(SHEET_DUTIES, DUTY_HEADERS).map(dutyOut_).filter(d => d.id === b.dutyId)[0];
   if (!duty) throw new Error('ไม่พบงาน');
+  if (duty.status === 'done') throw new Error('งานนี้เสร็จสิ้นแล้ว — กด “เปิดงานอีกครั้ง” ก่อนแก้ผลเช็คชื่อ');
   const date = String(b.date || '');
   if (duty.mode === 'overall') {
     if (date !== 'ALL') throw new Error('งานนี้เป็นแบบเช็ครวม');

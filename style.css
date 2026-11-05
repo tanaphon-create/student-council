@@ -302,6 +302,9 @@ textarea { resize: vertical; min-height: 90px; }
 .badge.ph { background: var(--green-50); color: var(--green-700); }
 .ph-upcoming .badge.ph, .badge.ph-upcoming { background: var(--gold-50); color: #7a5a00; }
 .ph-ended .badge.ph, .badge.ph-ended { background: #eef0ee; color: var(--muted); }
+.duty-card.ph-done { border-top-color: var(--green-600, #1f7a4d); }
+.ph-done .badge.ph, .badge.ph-done { background: #e3f4ea; color: #146c3f; }
+.done-note { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: #e3f4ea; color: #146c3f; font-weight: 600; font-size: 14px; }
 .badge.mode { background: #eef1fb; color: var(--blue); }
 .dc-meta { margin: 0; color: var(--muted); font-size: 14px; }
 .progress { height: 8px; background: #edf1ee; border-radius: 99px; overflow: hidden; margin: 14px 0 8px; }

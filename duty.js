@@ -33,7 +33,9 @@
   }
   const periodLabel = (d) => d.startDate === d.endDate ? SC.thDate(d.startDate) : `${SC.thDate(d.startDate)} – ${SC.thDate(d.endDate)}`;
   const timeLabel = (d) => d.timeStart ? `${d.timeStart}${d.timeEnd ? '–' + d.timeEnd : ''} น.` : 'ไม่ระบุเวลา';
+  const isDone = (d) => d.status === 'done';
   function phase(d) {
+    if (isDone(d)) return { key: 'done', label: 'เสร็จสิ้น' };
     const t = today();
     if (t < d.startDate) return { key: 'upcoming', label: 'ยังไม่เริ่ม' };
     if (t > d.endDate) return { key: 'ended', label: 'สิ้นสุดแล้ว' };
@@ -66,7 +68,9 @@
   }
 
   // วันที่ต้องเช็ค (ถึงวันนี้) สำหรับคำนวณสรุป — งานแบบเช็ครวมมีครั้งเดียวคือ 'ALL'
-  const dueSessions = (d) => d.mode === 'overall' ? ['ALL'] : scheduleDates(d).filter(x => x <= today());
+  // งานที่กดเสร็จสิ้นแล้ว นับวันถึงวันที่กดเสร็จเท่านั้น
+  const cutoff = (d) => isDone(d) && d.doneAt && d.doneAt.slice(0, 10) < today() ? d.doneAt.slice(0, 10) : today();
+  const dueSessions = (d) => d.mode === 'overall' ? ['ALL'] : scheduleDates(d).filter(x => x <= cutoff(d));
 
   function summarize(d) {
     const sessions = dueSessions(d);
@@ -116,10 +120,10 @@
 
   /* ================= รายการงาน ================= */
   function renderList() {
-    const order = { ongoing: 0, upcoming: 1, ended: 2 };
+    const order = { ongoing: 0, upcoming: 1, done: 2, ended: 2 };
     const list = [...ds.duties].sort((a, b) => order[phase(a).key] - order[phase(b).key] || b.startDate.localeCompare(a.startDate));
     const ongoing = list.filter(d => phase(d).key === 'ongoing').length;
-    const todayDuties = list.filter(d => d.mode === 'daily' && scheduleDates(d).includes(today()));
+    const todayDuties = list.filter(d => !isDone(d) && d.mode === 'daily' && scheduleDates(d).includes(today()));
     $('#dutyView').innerHTML = `
       <div class="stats">
         <div class="stat stat-balance"><span>งานวันนี้</span><strong>${todayDuties.length ? todayDuties.map(d => esc(d.title)).join(', ') : 'ไม่มีงานเช็ครายวัน'}</strong></div>
@@ -138,7 +142,7 @@
 
   function dutyCard(d) {
     const ph = phase(d), s = summarize(d);
-    const total = d.mode === 'overall' ? 1 : scheduleDates(d).length;
+    const total = d.mode === 'overall' ? 1 : isDone(d) ? dueSessions(d).length : scheduleDates(d).length;
     const pct = total ? Math.round(s.checkedSessions * 100 / total) : 0;
     return `
       <a class="duty-card ph-${ph.key}" href="#duty/${esc(d.id)}">
@@ -165,8 +169,11 @@
             <div class="dc-top"><span class="badge ph ph-${ph.key}">${ph.label}</span><span class="badge mode">${d.mode === 'overall' ? 'เช็ครวม' : 'เช็ครายวัน'}</span></div>
             <h2>${esc(d.title)}</h2>
           </div>
-          ${can('attendance') ? `<div class="head-actions"><button class="btn btn-ghost btn-sm" id="btnEditDuty">แก้ไขงาน</button><button class="btn btn-ghost btn-sm danger" id="btnDelDuty">ลบงาน</button></div>` : ''}
+          ${can('attendance') ? `<div class="head-actions">
+            ${isDone(d) ? '<button class="btn btn-ghost btn-sm" id="btnDoneDuty">เปิดงานอีกครั้ง</button>' : '<button class="btn btn-in btn-sm" id="btnDoneDuty">✓ เสร็จสิ้น</button>'}
+            <button class="btn btn-ghost btn-sm" id="btnEditDuty">แก้ไขงาน</button><button class="btn btn-ghost btn-sm danger" id="btnDelDuty">ลบงาน</button></div>` : ''}
         </div>
+        ${isDone(d) ? `<p class="done-note">✓ งานนี้เสร็จสิ้นแล้ว${d.doneAt ? ` เมื่อ ${SC.thDate(d.doneAt.slice(0, 10))}${d.doneAt.length > 10 ? ' เวลา ' + d.doneAt.slice(11, 16) + ' น.' : ''}` : ''}${d.doneByName ? ` โดย ${esc(d.doneByName)}` : ''}</p>` : ''}
         ${d.detail ? `<p class="di-detail">${esc(d.detail)}</p>` : ''}
         <dl class="di-meta">
           <div><dt>ช่วงวันที่</dt><dd>${periodLabel(d)}</dd></div>
@@ -185,6 +192,18 @@
     const ed = $('#btnEditDuty');
     if (ed) {
       ed.onclick = () => dutyForm(d);
+      $('#btnDoneDuty').onclick = async (e) => {
+        const done = !isDone(d);
+        if (done && dirty()) return toast('กรุณาบันทึกการเช็คชื่อก่อนกดเสร็จสิ้น', true);
+        if (!confirm(done ? `ยืนยันว่างาน “${d.title}” เสร็จสิ้นแล้ว?\nหลังกดเสร็จสิ้นจะแก้ผลเช็คชื่อไม่ได้ จนกว่าจะกดเปิดงานอีกครั้ง` : `เปิดงาน “${d.title}” อีกครั้ง?`)) return;
+        e.target.disabled = true;
+        try {
+          await SC.authed({ action: 'setDutyDone', id: d.id, done });
+          ds.saved = '';
+          await refresh();
+          toast(done ? 'บันทึกว่างานเสร็จสิ้นแล้ว' : 'เปิดงานอีกครั้งแล้ว');
+        } catch (err) { toast(err.message, true); e.target.disabled = false; }
+      };
       $('#btnDelDuty').onclick = async () => {
         if (!confirm(`ลบงาน “${d.title}” ? ผลการเช็คชื่อของงานนี้จะไม่แสดงอีก`)) return;
         try { await SC.authed({ action: 'deleteDuty', id: d.id }); toast('ลบงานแล้ว'); location.hash = '#duty'; } catch (e) { toast(e.message, true); }
@@ -218,7 +237,7 @@
   window.addEventListener('beforeunload', (e) => { if (dirty()) e.preventDefault(); });
 
   function renderSheet(d) {
-    const editable = can('attendance');
+    const editable = can('attendance') && !isDone(d);
     const dates = d.mode === 'daily' ? scheduleDates(d) : [];
     const records = d.memberIds.map(id => ds.idx.get(key(d.id, ds.date, id))).filter(Boolean);
     const last = records.sort((a, b) => String(b.checkedAt).localeCompare(String(a.checkedAt)))[0];
@@ -600,11 +619,19 @@
     x.duties.push({ id, ...v, status: 'active', createdByName: u.name, createdAt: new Date().toISOString() });
     return { id };
   };
+  ext.setDutyDone = (db, b, sess) => {
+    const u = sess('attendance'), d = demoDb(db).duties.find(t => t.id === b.id && t.status !== 'deleted');
+    if (!d) throw new Error('ไม่พบงาน');
+    const n = new Date(), p = (x) => String(x).padStart(2, '0');
+    Object.assign(d, b.done ? { status: 'done', doneAt: `${iso(n)}T${p(n.getHours())}:${p(n.getMinutes())}`, doneByName: u.name } : { status: 'active', doneAt: '', doneByName: '' });
+    return true;
+  };
   ext.deleteDuty = (db, b, sess) => { sess('attendance'); demoDb(db).duties.find(d => d.id === b.id).status = 'deleted'; return true; };
   ext.saveAttendance = (db, b, sess) => {
     const u = sess('attendance'), x = demoDb(db);
     const d = x.duties.find(t => t.id === b.dutyId && t.status !== 'deleted');
     if (!d) throw new Error('ไม่พบงาน');
+    if (d.status === 'done') throw new Error('งานนี้เสร็จสิ้นแล้ว — กด “เปิดงานอีกครั้ง” ก่อนแก้ผลเช็คชื่อ');
     if (d.mode === 'overall' ? b.date !== 'ALL' : !scheduleDates(d).includes(b.date)) throw new Error('วันที่นี้ไม่อยู่ในตารางปฏิบัติงาน');
     const recs = (b.records || []).filter(r => d.memberIds.includes(r.memberId));
     const touched = new Set(recs.map(r => r.memberId)), now = new Date().toISOString();
