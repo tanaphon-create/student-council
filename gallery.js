@@ -13,6 +13,8 @@
   const monthLabel = (ym) => parse(ym + '-01').toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
   const longDate = (s) => parse(s).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const folderUrl = (id) => `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
+  // รูปปกที่ใช้จริง: รูปที่เลือกไว้ ถ้าไม่ได้เลือก (หรือถูกลบ) ใช้รูปแรกที่มีรูปย่อ
+  const coverOf = (a) => (a.photos.find(p => p.id === a.coverId && p.thumb) || a.photos.find(p => p.thumb) || {}).id;
 
   /* ================= เส้นทาง ================= */
   document.addEventListener('sc:gallery', async (e) => {
@@ -121,12 +123,13 @@
           </div>` : ''}
         </div>
         ${a.detail ? `<p class="di-detail">${esc(a.detail)}</p>` : ''}
-        <p class="hint">${a.photos.length} รูป${staff() ? ' · รูปจะถูกย่อให้ยาวไม่เกิน 1920 px ก่อนอัปโหลด' : ''}</p>
+        <p class="hint">${a.photos.length} รูป${staff() ? ' · รูปจะถูกย่อให้ยาวไม่เกิน 1920 px ก่อนอัปโหลด · เปลี่ยนรูปปก: กดรูปที่ต้องการ แล้วกด “ตั้งเป็นปก”' : ''}</p>
         <input type="file" id="galFiles" accept="image/*" multiple hidden>
         <div id="galProgress" class="gal-progress" hidden></div>
       </div>
       ${a.photos.length ? `<div class="gal-photos">${a.photos.map((p, i) => `<button class="gal-ph" data-i="${i}" aria-label="ดูรูปที่ ${i + 1}">
-        ${p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : '<span class="gal-wait">กำลังเตรียมรูปย่อ…</span>'}</button>`).join('')}</div>`
+        ${p.thumb ? `<img src="${esc(p.thumb)}" alt="" loading="lazy">` : '<span class="gal-wait">กำลังเตรียมรูปย่อ…</span>'}
+        ${p.id === coverOf(a) ? '<span class="gal-cover-tag">★ ปก</span>' : ''}</button>`).join('')}</div>`
         : `<div class="card empty-state"><p class="empty">อัลบั้มนี้ยังไม่มีรูป</p>${staff() ? '<p class="hint" style="text-align:center">กด “+ อัปโหลดรูป” เลือกได้หลายรูปพร้อมกัน</p>' : ''}</div>`}`;
     $$('.gal-ph').forEach(b => (b.onclick = () => lightbox(Number(b.dataset.i))));
     if (!staff()) return;
@@ -242,6 +245,7 @@
     box.innerHTML = `
       <div class="lb-top"><span>${i + 1} / ${a.photos.length}</span><span class="spacer"></span>
         <a class="lb-btn" id="lbDl" download="${esc(a.title)}-${i + 1}.jpg" aria-label="ดาวน์โหลด" hidden>⬇︎ ดาวน์โหลด</a>
+        ${staff() && p.thumb ? (p.id === coverOf(a) ? '<span class="lb-btn lb-on">★ รูปปกอัลบั้ม</span>' : '<button class="lb-btn" id="lbCover">☆ ตั้งเป็นปก</button>') : ''}
         ${staff() ? '<button class="lb-btn" id="lbDel">ลบรูป</button>' : ''}
         <button class="lb-btn" id="lbX" aria-label="ปิด">✕</button></div>
       <button class="lb-nav prev" aria-label="รูปก่อนหน้า" ${i ? '' : 'hidden'}>‹</button>
@@ -257,6 +261,18 @@
     let x0 = null;
     box.ontouchstart = (e) => { x0 = e.touches[0].clientX; };
     box.ontouchend = (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); x0 = null; };
+    const cov = $('#lbCover');
+    if (cov) cov.onclick = async () => {
+      cov.disabled = true;
+      try {
+        await SC.authed({ action: 'setAlbumCover', albumId: a.id, photoId: p.id });
+        a.coverId = p.id;
+        gs.albums = null;
+        toast('ตั้งเป็นรูปปกอัลบั้มแล้ว');
+        renderAlbum();
+        lightbox(i);
+      } catch (err) { toast(err.message, true); cov.disabled = false; }
+    };
     const del = $('#lbDel');
     if (del) del.onclick = async () => {
       if (!confirm('ลบรูปนี้? ไฟล์จะถูกย้ายไปถังขยะของ Google Drive')) return;
@@ -337,7 +353,7 @@
     const g = demoDb(db);
     return out(g.albums.filter(a => a.status !== 'deleted').map(a => {
       const ph = g.photos.filter(p => p.albumId === a.id);
-      return { ...a, count: ph.length, cover: (ph.find(p => p.thumb) || {}).thumb || '' };
+      return { ...a, count: ph.length, cover: (ph.find(p => p.id === a.coverId && p.thumb) || ph.find(p => p.thumb) || {}).thumb || '' };
     }));
   };
   ext.album = (db, b) => out({ ...findAlbum(db, b.id), photos: demoDb(db).photos.filter(p => p.albumId === b.id).map(({ data, ...p }) => p) });
@@ -361,7 +377,14 @@
     const { data, ...rest } = p;
     return out(rest);
   };
-  ext.deleteGalleryPhoto = (db, b, sess) => { sess('gallery'); const g = demoDb(db); g.photos = g.photos.filter(p => p.id !== b.id); return true; };
+  ext.setAlbumCover = (db, b, sess) => {
+    sess('gallery');
+    const a = findAlbum(db, b.albumId);
+    if (!demoDb(db).photos.some(p => p.id === b.photoId && p.albumId === a.id)) throw new Error('ไม่พบรูปในอัลบั้มนี้');
+    a.coverId = b.photoId;
+    return true;
+  };
+  ext.deleteGalleryPhoto =(db, b, sess) => { sess('gallery'); const g = demoDb(db); g.photos = g.photos.filter(p => p.id !== b.id); return true; };
   ext.syncAlbum = (db, b, sess) => { sess('gallery'); findAlbum(db, b.id); return { added: 0 }; };
   ext.setGalleryThumb = (db, b, sess) => { sess('gallery'); const p = demoDb(db).photos.find(x => x.id === b.id); if (p) p.thumb = b.thumb; return true; };
 })();

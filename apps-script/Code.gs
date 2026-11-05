@@ -69,7 +69,7 @@ const FEEDBACK_PER_HOUR = 5;
 const PHOTO_HEADERS = ['memberId', 'data', 'updatedByName', 'updatedAt'];
 const PHOTO_MAX = 45000;
 // คลังภาพ: ไฟล์รูปเก็บใน Google Drive (คลังภาพสภานักเรียน / ปี พ.ศ. / วันที่ ชื่อกิจกรรม) ส่วนชีตเก็บรูปย่อไว้แสดงเร็ว
-const ALBUM_HEADERS = ['id', 'title', 'date', 'detail', 'folderId', 'status', 'createdByName', 'createdAt', 'updatedAt'];
+const ALBUM_HEADERS = ['id', 'title', 'date', 'detail', 'folderId', 'status', 'createdByName', 'createdAt', 'updatedAt', 'coverId'];
 const GPHOTO_HEADERS = ['id', 'albumId', 'fileId', 'thumb', 'public', 'createdByName', 'createdAt'];
 const GALLERY_ROOT_NAME = 'คลังภาพสภานักเรียน';
 const GALLERY_MAX_BYTES = 8 * 1024 * 1024;
@@ -149,7 +149,7 @@ function doPost(e) {
       setMemberPhoto: setMemberPhoto_, saveAdvisor: saveAdvisor_, deleteAdvisor: deleteAdvisor_,
       submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
       saveAlbum: saveAlbum_, deleteAlbum: deleteAlbum_, uploadGalleryPhoto: uploadGalleryPhoto_,
-      deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_,
+      deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_, setAlbumCover: setAlbumCover_,
     };
     const fn = handlers[body.action];
     if (!fn) throw new Error('ไม่รู้จักคำสั่ง');
@@ -1021,19 +1021,20 @@ function childFolder_(parent, name) {
 const beYear_ = (date) => String(Number(String(date).slice(0, 4)) + 543);
 const albumFolderName_ = (a) => `${a.date} ${a.title}`.replace(/[\/\\]/g, '-');
 
-const albumOut_ = (a) => ({ id: str_(a.id), title: str_(a.title), date: str_(a.date), detail: str_(a.detail), folderId: str_(a.folderId) });
+const albumOut_ = (a) => ({ id: str_(a.id), title: str_(a.title), date: str_(a.date), detail: str_(a.detail), folderId: str_(a.folderId), coverId: str_(a.coverId) });
 const gphotoOut_ = (p) => ({ id: str_(p.id), fileId: str_(p.fileId), thumb: str_(p.thumb), public: str_(p.public) === 'true' });
 
 function listAlbums_() {
   const photos = readRows_(SHEET_GPHOTOS, GPHOTO_HEADERS);
-  const count = {}, cover = {};
+  const count = {}, first = {}, thumbs = {};
   photos.forEach(p => {
     const id = str_(p.albumId);
     count[id] = (count[id] || 0) + 1;
-    if (!cover[id] && str_(p.thumb)) cover[id] = str_(p.thumb);
+    if (str_(p.thumb)) { thumbs[str_(p.id)] = str_(p.thumb); if (!first[id]) first[id] = str_(p.thumb); }
   });
+  // ปกอัลบั้ม: รูปที่เลือกไว้ ถ้าไม่ได้เลือก (หรือรูปถูกลบ) ใช้รูปแรก
   return readRows_(SHEET_ALBUMS, ALBUM_HEADERS).filter(a => str_(a.status) !== 'deleted')
-    .map(a => Object.assign(albumOut_(a), { count: count[str_(a.id)] || 0, cover: cover[str_(a.id)] || '' }));
+    .map(a => Object.assign(albumOut_(a), { count: count[str_(a.id)] || 0, cover: thumbs[str_(a.coverId)] || first[str_(a.id)] || '' }));
 }
 
 function findAlbum_(id) {
@@ -1115,6 +1116,15 @@ function uploadGalleryPhoto_(b) {
     createdByName: user.name, createdAt: new Date().toISOString() };
   sheet_(SHEET_GPHOTOS).appendRow(GPHOTO_HEADERS.map(h => row[h]));
   return gphotoOut_(row);
+}
+
+function setAlbumCover_(b) {
+  requireSession_(b.token, 'gallery');
+  const a = findAlbum_(b.albumId);
+  const p = readRows_(SHEET_GPHOTOS, GPHOTO_HEADERS).filter(x => str_(x.id) === String(b.photoId) && str_(x.albumId) === a.id)[0];
+  if (!p) throw new Error('ไม่พบรูปในอัลบั้มนี้');
+  sheet_(SHEET_ALBUMS).getRange(findRow_(SHEET_ALBUMS, a.id), ALBUM_HEADERS.indexOf('coverId') + 1).setValue(str_(p.id));
+  return true;
 }
 
 function deleteGalleryPhoto_(b) {
