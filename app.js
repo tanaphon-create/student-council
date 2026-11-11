@@ -62,7 +62,7 @@
         users: [
           { username: 'admin', name: 'ผู้ดูแลระบบ', position: 'ครูที่ปรึกษาสภา', role: 'admin', perms: [], password: 'admin1234', active: true },
           { username: 'treasurer', name: 'นางสาวตัวอย่าง ใจดี', position: 'เหรัญญิก', role: 'member', perms: ['finance'], password: 'demo1234', active: true },
-          { username: 'president', name: 'นายภูมิพัฒน์ ศรีสุข', position: 'ประธานนักเรียน', role: 'member', perms: ['calendar', 'attendance', 'feedback', 'gallery'], password: 'demo1234', active: true },
+          { username: 'president', name: 'นายภูมิพัฒน์ ศรีสุข', position: 'ประธานนักเรียน', role: 'member', perms: ['calendar', 'attendance', 'feedback', 'gallery', 'certs'], password: 'demo1234', active: true },
           { username: 'leader', name: 'นายหัวหน้า ตัวอย่าง', position: 'หัวหน้าฝ่ายปฏิบัติงาน', role: 'member', perms: ['attendance'], password: 'demo1234', active: true },
         ],
         tx: [], sessions: {},
@@ -174,7 +174,7 @@
 
   /* ================= สิทธิ์ ================= */
   // finance = บันทึกบัญชี, attendance = หัวหน้าเช็คชื่อ, calendar = บันทึกปฏิทินงาน, admin ได้ทุกสิทธิ์
-  const PERM_LABELS = { finance: 'บันทึกบัญชี', attendance: 'หัวหน้าเช็คชื่อ', calendar: 'บันทึกปฏิทินงาน', feedback: 'ตอบรับความคิดเห็น', gallery: 'คลังภาพ' };
+  const PERM_LABELS = { finance: 'บันทึกบัญชี', attendance: 'หัวหน้าเช็คชื่อ', calendar: 'บันทึกปฏิทินงาน', feedback: 'ตอบรับความคิดเห็น', gallery: 'คลังภาพ', certs: 'คลังเกียรติบัตร' };
   function permsOf(u) {
     if (u.role === 'admin') return Object.keys(PERM_LABELS);
     return Array.isArray(u.perms) ? u.perms.filter(p => p !== 'none') : ['finance'];
@@ -540,6 +540,7 @@
         <label class="chk"><input type="checkbox" name="pf" value="calendar" ${has('calendar')}> บันทึกปฏิทินงาน (ประธานนักเรียน / ครู)</label>
         <label class="chk"><input type="checkbox" name="pf" value="feedback" ${has('feedback')}> ตอบรับความคิดเห็น (อ่านและตอบเรื่องที่นักเรียนส่งมา)</label>
         <label class="chk"><input type="checkbox" name="pf" value="gallery" ${has('gallery')}> คลังภาพ (สร้างอัลบั้มกิจกรรม อัปโหลดและลบรูป)</label>
+        <label class="chk"><input type="checkbox" name="pf" value="certs" ${has('certs')}> คลังเกียรติบัตร (อัปโหลด แก้ไข และลบเกียรติบัตร)</label>
         <label class="chk"><input type="checkbox" name="isAdmin" ${u.role === 'admin' ? 'checked' : ''}> ผู้ดูแลระบบ (ทำได้ทุกอย่าง)</label>
       </div></div>`;
   }
@@ -573,7 +574,7 @@
   /* ================= router ================= */
   function route() {
     let [r, param] = (location.hash || '#home').slice(1).split('/');
-    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee', 'gallery'].includes(r)) r = 'home';
+    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee', 'gallery', 'certs'].includes(r)) r = 'home';
     if (r === 'members' && !isAdmin()) r = 'finance';
     const page = r === 'calendar' ? 'home' : r; // ปฏิทินอยู่ในหน้าแรก
     $$('.page').forEach(p => (p.hidden = p.id !== 'page-' + page));
@@ -584,6 +585,7 @@
     if (r === 'feedback') document.dispatchEvent(new CustomEvent('sc:feedback', { detail: param || '' }));
     if (r === 'committee') document.dispatchEvent(new CustomEvent('sc:committee', { detail: param || '' }));
     if (r === 'gallery') document.dispatchEvent(new CustomEvent('sc:gallery', { detail: param || '' }));
+    if (r === 'certs') document.dispatchEvent(new CustomEvent('sc:certs', { detail: param || '' }));
     window.scrollTo(0, 0);
     if (page === 'home') document.dispatchEvent(new CustomEvent('sc:home', { detail: { scroll: r === 'calendar' } }));
   }

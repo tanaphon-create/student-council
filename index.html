@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
   <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บ และเมื่อกดหน้าแรก -->
@@ -74,6 +74,7 @@
         <a href="#feedback" data-route="feedback">ความคิดเห็น</a>
         <a href="#committee" data-route="committee">ทำเนียบ</a>
         <a href="#gallery" data-route="gallery">คลังภาพ</a>
+        <a href="#certs" data-route="certs">เกียรติบัตร</a>
         <a href="#members" data-route="members" class="admin-only" hidden>ผู้ใช้และสิทธิ์</a>
       </nav>
       <div class="auth" id="authBox"></div>
@@ -140,6 +141,7 @@
           <a class="feature active" href="#feedback"><span class="f-icon">💬</span><h3>รับฟังความคิดเห็น</h3><p>ส่งข้อเสนอแนะ เรื่องร้องเรียน หรือคำชื่นชมถึงสภา ไม่ต้องระบุชื่อก็ได้ พร้อมรหัสติดตามเรื่อง</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#vote"><span class="f-icon">🗳️</span><h3>โหวต / สำรวจ</h3><p>ลงคะแนนและสำรวจความเห็นนักเรียน ผู้ดูแลเปิดโหวตได้ทั้งแบบทุกคน สมาชิกสภา หรือใช้รหัสโหวต</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#gallery"><span class="f-icon">🖼️</span><h3>คลังภาพกิจกรรม</h3><p>ภาพกิจกรรมของสภานักเรียน จัดเป็นอัลบั้มตามกิจกรรม เลือกดูตามปี เดือน และวันที่</p><span class="tag tag-live">เปิดใช้งาน</span></a>
+          <a class="feature active" href="#certs"><span class="f-icon">🏆</span><h3>คลังเกียรติบัตร</h3><p>รวมเกียรติบัตรของสภานักเรียนและสมาชิก ค้นหาด้วยชื่อ ดูและดาวน์โหลดได้ทันที</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#committee"><span class="f-icon">👥</span><h3>ทำเนียบกรรมการ</h3><p>รายชื่อคณะกรรมการสภานักเรียนประจำปี แยกตามตำแหน่งและฝ่าย ค้นหาได้</p><span class="tag tag-live">เปิดใช้งาน</span></a>
         </div>
       </div>
@@ -258,6 +260,16 @@
       <div class="wrap" id="galleryView"></div>
     </section>
 
+    <!-- คลังเกียรติบัตร -->
+    <section class="page" id="page-certs" hidden>
+      <div class="page-head">
+        <div class="wrap page-head-in">
+          <div><p class="eyebrow">ความภาคภูมิใจของสภานักเรียน</p><h1>คลังเกียรติบัตร</h1></div>
+        </div>
+      </div>
+      <div class="wrap" id="certsView"></div>
+    </section>
+
     <!-- จัดการสมาชิก -->
     <section class="page" id="page-members" hidden>
       <div class="page-head">
@@ -291,12 +303,13 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="config.js?v=2"></script>
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
   <script src="duty.js?v=6"></script>
   <script src="calendar.js?v=4"></script>
   <script src="vote.js?v=2"></script>
   <script src="feedback.js?v=1"></script>
   <script src="committee.js?v=6"></script>
   <script src="gallery.js?v=2"></script>
+  <script src="certs.js?v=1"></script>
 </body>
 </html>

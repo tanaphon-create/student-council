@@ -35,11 +35,13 @@ const SHEET_PHOTOS = 'Photos';
 const SHEET_ADVISORS = 'Advisors';
 const SHEET_ALBUMS = 'Albums';
 const SHEET_GPHOTOS = 'GalleryPhotos';
+const SHEET_CERTS = 'Certificates';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
 // perms: สิทธิ์คั่นด้วยจุลภาค finance = บันทึกบัญชี, attendance = หัวหน้าเช็คชื่อ,
-// calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู), feedback = ตอบรับความคิดเห็น, gallery = คลังภาพ — admin ได้ทุกสิทธิ์
+// calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู), feedback = ตอบรับความคิดเห็น, gallery = คลังภาพ,
+// certs = คลังเกียรติบัตร — admin ได้ทุกสิทธิ์
 const USER_HEADERS = ['username', 'name', 'position', 'role', 'salt', 'hash', 'active', 'createdAt', 'perms'];
 const MEMBER_HEADERS = ['id', 'name', 'classroom', 'position', 'active', 'createdAt', 'studentId'];
 const DUTY_HEADERS = ['id', 'title', 'detail', 'startDate', 'endDate', 'days', 'timeStart', 'timeEnd',
@@ -73,6 +75,12 @@ const ALBUM_HEADERS = ['id', 'title', 'date', 'detail', 'folderId', 'status', 'c
 const GPHOTO_HEADERS = ['id', 'albumId', 'fileId', 'thumb', 'public', 'createdByName', 'createdAt'];
 const GALLERY_ROOT_NAME = 'คลังภาพสภานักเรียน';
 const GALLERY_MAX_BYTES = 8 * 1024 * 1024;
+// คลังเกียรติบัตร: ไฟล์ PDF/รูปเก็บใน Drive (คลังเกียรติบัตรสภานักเรียน / ปี พ.ศ.) ส่วนชีตเก็บข้อมูลและรูปย่อ
+const CERT_HEADERS = ['id', 'title', 'recipient', 'issuer', 'date', 'category', 'fileId', 'mime', 'thumb', 'public', 'status',
+  'createdByName', 'createdAt', 'updatedAt'];
+const CERT_CATEGORIES = ['award', 'join', 'thanks', 'other'];
+const CERT_ROOT_NAME = 'คลังเกียรติบัตรสภานักเรียน';
+const CERT_MAX_BYTES = 10 * 1024 * 1024;
 // ครูที่ปรึกษา: แยกจากรายชื่อนักเรียน (ไม่เข้าระบบเช็คชื่อ) แสดงบนสุดของทำเนียบ
 const ADVISOR_HEADERS = ['id', 'name', 'position', 'sort', 'active', 'updatedByName', 'updatedAt'];
 
@@ -105,7 +113,9 @@ function setup() {
   ensure(SHEET_ADVISORS, ADVISOR_HEADERS, true);
   ensure(SHEET_ALBUMS, ALBUM_HEADERS, true);
   ensure(SHEET_GPHOTOS, GPHOTO_HEADERS, true);
+  ensure(SHEET_CERTS, CERT_HEADERS, true);
   galleryRoot_(); // สร้างโฟลเดอร์คลังภาพใน Drive (ครั้งแรกจะขอสิทธิ์เข้าถึง Drive)
+  certRoot_();
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -128,6 +138,8 @@ function doGet(e) {
     if (action === 'albums') return json_({ ok: true, data: listAlbums_() });
     if (action === 'album') return json_({ ok: true, data: getAlbum_(e.parameter.id) });
     if (action === 'gphoto') return json_({ ok: true, data: galleryPhotoData_(e.parameter.id) });
+    if (action === 'certs') return json_({ ok: true, data: listCerts_() });
+    if (action === 'certFile') return json_({ ok: true, data: certFileData_(e.parameter.id) });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
@@ -150,6 +162,7 @@ function doPost(e) {
       submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
       saveAlbum: saveAlbum_, deleteAlbum: deleteAlbum_, uploadGalleryPhoto: uploadGalleryPhoto_,
       deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_, setAlbumCover: setAlbumCover_,
+      uploadCert: uploadCert_, updateCert: updateCert_, deleteCert: deleteCert_,
     };
     const fn = handlers[body.action];
     if (!fn) throw new Error('ไม่รู้จักคำสั่ง');
@@ -330,7 +343,7 @@ function requireSession_(token, need) {
 
 // ผู้ใช้เก่าที่ยังไม่มีคอลัมน์ perms และเป็น member ถือว่าบันทึกบัญชีได้ตามเดิม
 function permsOf_(u) {
-  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback', 'gallery'];
+  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback', 'gallery', 'certs'];
   const p = String(u.perms || '').trim();
   return p ? p.split(',').filter(x => x) : ['finance'];
 }
@@ -341,7 +354,7 @@ function hasPerm_(u, need) {
 }
 
 function cleanPerms_(perms) {
-  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback', 'gallery'].indexOf(p) >= 0);
+  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback', 'gallery', 'certs'].indexOf(p) >= 0);
   return list.length ? list.join(',') : 'none';
 }
 
@@ -1157,5 +1170,92 @@ function setGalleryThumb_(b) {
   requireSession_(b.token, 'gallery');
   const row = findRow_(SHEET_GPHOTOS, b.id);
   sheet_(SHEET_GPHOTOS).getRange(row, GPHOTO_HEADERS.indexOf('thumb') + 1).setValue(cleanThumb_(b.thumb));
+  return true;
+}
+
+/* ---------- คลังเกียรติบัตร ---------- */
+function certRoot_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('CERT_ROOT');
+  if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (_) { /* ถูกลบ สร้างใหม่ */ } }
+  const f = DriveApp.createFolder(CERT_ROOT_NAME);
+  props.setProperty('CERT_ROOT', f.getId());
+  return f;
+}
+
+const certOut_ = (c) => ({
+  id: str_(c.id), title: str_(c.title), recipient: str_(c.recipient), issuer: str_(c.issuer), date: str_(c.date),
+  category: CERT_CATEGORIES.indexOf(str_(c.category)) >= 0 ? str_(c.category) : 'other', fileId: str_(c.fileId),
+  mime: str_(c.mime), thumb: str_(c.thumb), public: str_(c.public) === 'true',
+});
+
+function listCerts_() {
+  return readRows_(SHEET_CERTS, CERT_HEADERS).filter(c => str_(c.status) !== 'deleted').map(certOut_);
+}
+
+function findCert_(id) {
+  const c = readRows_(SHEET_CERTS, CERT_HEADERS).filter(x => str_(x.id) === String(id) && str_(x.status) !== 'deleted')[0];
+  if (!c) throw new Error('ไม่พบเกียรติบัตร');
+  return certOut_(c);
+}
+
+// ไฟล์เต็มสำหรับดู/ดาวน์โหลด — เฉพาะไฟล์ที่ลงทะเบียนในคลังเท่านั้น
+function certFileData_(id) {
+  const blob = DriveApp.getFileById(findCert_(id).fileId).getBlob();
+  if (blob.getBytes().length > 15 * 1024 * 1024) throw new Error('ไฟล์ใหญ่เกินกว่าจะแสดงบนเว็บ');
+  return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+}
+
+function certFields_(b) {
+  const v = {
+    title: clean_(b.title, 200), recipient: clean_(b.recipient, 150), issuer: clean_(b.issuer, 150), date: String(b.date || ''),
+    category: CERT_CATEGORIES.indexOf(b.category) >= 0 ? b.category : 'other',
+  };
+  if (!v.title) throw new Error('กรุณาระบุชื่อรายการเกียรติบัตร');
+  if (!v.recipient) throw new Error('กรุณาระบุชื่อผู้ได้รับ');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) throw new Error('วันที่ไม่ถูกต้อง');
+  return v;
+}
+const certFileName_ = (v) => `${v.date} ${v.title} - ${v.recipient}`.replace(/[\/\\]/g, '-').slice(0, 180);
+
+// อัปโหลดทีละไฟล์: data = base64 ของไฟล์ (PDF หรือ JPEG ที่ย่อแล้ว), thumb = รูปย่อหน้าแรก (data URL)
+function uploadCert_(b) {
+  const user = requireSession_(b.token, 'certs');
+  const v = certFields_(b);
+  const mime = b.mime === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+  const data = String(b.data || '');
+  if (!/^[A-Za-z0-9+\/=]+$/.test(data)) throw new Error('ไฟล์ไม่ถูกต้อง');
+  const bytes = Utilities.base64Decode(data);
+  if (bytes.length > CERT_MAX_BYTES) throw new Error('ไฟล์ใหญ่เกิน 10 MB');
+  const folder = childFolder_(certRoot_(), beYear_(v.date));
+  const file = folder.createFile(Utilities.newBlob(bytes, mime, certFileName_(v) + (mime === 'application/pdf' ? '.pdf' : '.jpg')));
+  const now = new Date().toISOString();
+  const row = Object.assign(v, { id: Utilities.getUuid(), fileId: file.getId(), mime, thumb: cleanThumb_(b.thumb), public: shareFile_(file),
+    status: 'active', createdByName: user.name, createdAt: now, updatedAt: now });
+  sheet_(SHEET_CERTS).appendRow(CERT_HEADERS.map(h => row[h]));
+  return certOut_(row);
+}
+
+function updateCert_(b) {
+  requireSession_(b.token, 'certs');
+  const cur = findCert_(b.id);
+  const v = Object.assign(certFields_(b), { updatedAt: new Date().toISOString() });
+  const row = findRow_(SHEET_CERTS, cur.id), sheet = sheet_(SHEET_CERTS);
+  const old = sheet.getRange(row, 1, 1, CERT_HEADERS.length).getValues()[0];
+  sheet.getRange(row, 1, 1, CERT_HEADERS.length).setValues([CERT_HEADERS.map((h, i) => h in v ? v[h] : old[i])]);
+  try {
+    const file = DriveApp.getFileById(cur.fileId);
+    file.setName(certFileName_(v) + (cur.mime === 'application/pdf' ? '.pdf' : '.jpg'));
+    if (beYear_(cur.date) !== beYear_(v.date)) file.moveTo(childFolder_(certRoot_(), beYear_(v.date)));
+  } catch (_) { /* ไฟล์ถูกลบใน Drive */ }
+  return true;
+}
+
+// ลบ: ย้ายไฟล์ไปถังขยะของ Drive (กู้คืนได้ภายใน 30 วัน)
+function deleteCert_(b) {
+  requireSession_(b.token, 'certs');
+  const c = findCert_(b.id);
+  sheet_(SHEET_CERTS).getRange(findRow_(SHEET_CERTS, c.id), CERT_HEADERS.indexOf('status') + 1).setValue('deleted');
+  try { DriveApp.getFileById(c.fileId).setTrashed(true); } catch (_) { /* ไฟล์ถูกลบไปแล้ว */ }
   return true;
 }
