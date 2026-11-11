@@ -37,12 +37,13 @@ const SHEET_ALBUMS = 'Albums';
 const SHEET_GPHOTOS = 'GalleryPhotos';
 const SHEET_CERT_EVENTS = 'CertEvents';
 const SHEET_CERTS = 'CertFiles';
+const SHEET_NEWS = 'News';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
 // perms: สิทธิ์คั่นด้วยจุลภาค finance = บันทึกบัญชี, attendance = หัวหน้าเช็คชื่อ,
 // calendar = บันทึกปฏิทินงาน (ประธานนักเรียน/ครู), feedback = ตอบรับความคิดเห็น, gallery = คลังภาพ,
-// certs = คลังเกียรติบัตร — admin ได้ทุกสิทธิ์
+// certs = คลังเกียรติบัตร, news = ประกาศข่าว — admin ได้ทุกสิทธิ์
 const USER_HEADERS = ['username', 'name', 'position', 'role', 'salt', 'hash', 'active', 'createdAt', 'perms'];
 const MEMBER_HEADERS = ['id', 'name', 'classroom', 'position', 'active', 'createdAt', 'studentId'];
 const DUTY_HEADERS = ['id', 'title', 'detail', 'startDate', 'endDate', 'days', 'timeStart', 'timeEnd',
@@ -82,6 +83,11 @@ const CERT_HEADERS = ['id', 'eventId', 'recipient', 'fileId', 'mime', 'thumb', '
 const CERT_CATEGORIES = ['award', 'join', 'thanks', 'other'];
 const CERT_ROOT_NAME = 'คลังเกียรติบัตรสภานักเรียน';
 const CERT_MAX_BYTES = 10 * 1024 * 1024;
+// ประกาศ/ข่าวประชาสัมพันธ์: รูปประกอบเก็บใน Drive (ประกาศสภานักเรียน / ปี พ.ศ.) ชีตเก็บรูปย่อไว้แสดงเร็ว
+const NEWS_HEADERS = ['id', 'title', 'body', 'category', 'pinned', 'link', 'showUntil', 'imageFileId', 'thumb', 'public', 'status',
+  'createdByName', 'createdAt', 'updatedAt'];
+const NEWS_CATEGORIES = ['general', 'event', 'urgent', 'recruit'];
+const NEWS_ROOT_NAME = 'ประกาศสภานักเรียน';
 // ครูที่ปรึกษา: แยกจากรายชื่อนักเรียน (ไม่เข้าระบบเช็คชื่อ) แสดงบนสุดของทำเนียบ
 const ADVISOR_HEADERS = ['id', 'name', 'position', 'sort', 'active', 'updatedByName', 'updatedAt'];
 
@@ -121,6 +127,8 @@ function setup() {
   if (oldCerts && oldCerts.getLastRow() <= 1) ss.deleteSheet(oldCerts);
   galleryRoot_(); // สร้างโฟลเดอร์คลังภาพใน Drive (ครั้งแรกจะขอสิทธิ์เข้าถึง Drive)
   certRoot_();
+  ensure(SHEET_NEWS, NEWS_HEADERS, true);
+  newsRoot_();
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
     users.appendRow([ADMIN_USERNAME, ADMIN_NAME, 'ผู้ดูแลระบบ', 'admin', salt,
@@ -143,6 +151,8 @@ function doGet(e) {
     if (action === 'albums') return json_({ ok: true, data: listAlbums_() });
     if (action === 'album') return json_({ ok: true, data: getAlbum_(e.parameter.id) });
     if (action === 'gphoto') return json_({ ok: true, data: galleryPhotoData_(e.parameter.id) });
+    if (action === 'news') return json_({ ok: true, data: listNews_() });
+    if (action === 'newsImage') return json_({ ok: true, data: newsImageData_(e.parameter.id) });
     if (action === 'certEvents') return json_({ ok: true, data: listCertEvents_() });
     if (action === 'certEvent') return json_({ ok: true, data: getCertEvent_(e.parameter.id) });
     if (action === 'certFile') return json_({ ok: true, data: certFileData_(e.parameter.id) });
@@ -169,6 +179,7 @@ function doPost(e) {
       saveAlbum: saveAlbum_, deleteAlbum: deleteAlbum_, uploadGalleryPhoto: uploadGalleryPhoto_,
       deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_, setAlbumCover: setAlbumCover_,
       saveCertEvent: saveCertEvent_, deleteCertEvent: deleteCertEvent_,
+      saveNews: saveNews_, deleteNews: deleteNews_,
       uploadCert: uploadCert_, updateCert: updateCert_, deleteCert: deleteCert_,
     };
     const fn = handlers[body.action];
@@ -350,7 +361,7 @@ function requireSession_(token, need) {
 
 // ผู้ใช้เก่าที่ยังไม่มีคอลัมน์ perms และเป็น member ถือว่าบันทึกบัญชีได้ตามเดิม
 function permsOf_(u) {
-  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback', 'gallery', 'certs'];
+  if (u.role === 'admin') return ['finance', 'attendance', 'calendar', 'feedback', 'gallery', 'certs', 'news'];
   const p = String(u.perms || '').trim();
   return p ? p.split(',').filter(x => x) : ['finance'];
 }
@@ -361,7 +372,7 @@ function hasPerm_(u, need) {
 }
 
 function cleanPerms_(perms) {
-  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback', 'gallery', 'certs'].indexOf(p) >= 0);
+  const list = (Array.isArray(perms) ? perms : []).filter(p => ['finance', 'attendance', 'calendar', 'feedback', 'gallery', 'certs', 'news'].indexOf(p) >= 0);
   return list.length ? list.join(',') : 'none';
 }
 
@@ -1310,5 +1321,90 @@ function deleteCert_(b) {
   const c = findCert_(b.id);
   try { DriveApp.getFileById(c.fileId).setTrashed(true); } catch (_) { /* ไฟล์ถูกลบไปแล้ว */ }
   sheet_(SHEET_CERTS).deleteRow(findRow_(SHEET_CERTS, c.id));
+  return true;
+}
+
+/* ---------- ประกาศ/ข่าวประชาสัมพันธ์ ---------- */
+function newsRoot_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('NEWS_ROOT');
+  if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (_) { /* ถูกลบ สร้างใหม่ */ } }
+  const f = DriveApp.createFolder(NEWS_ROOT_NAME);
+  props.setProperty('NEWS_ROOT', f.getId());
+  return f;
+}
+
+const newsOut_ = (n) => ({
+  id: str_(n.id), title: str_(n.title), body: str_(n.body),
+  category: NEWS_CATEGORIES.indexOf(str_(n.category)) >= 0 ? str_(n.category) : 'general',
+  pinned: str_(n.pinned) === 'true', link: str_(n.link), showUntil: str_(n.showUntil),
+  imageFileId: str_(n.imageFileId), thumb: str_(n.thumb), public: str_(n.public) === 'true',
+  createdByName: str_(n.createdByName), createdAt: str_(n.createdAt), updatedAt: str_(n.updatedAt),
+});
+
+// ส่งทุกประกาศที่ยังไม่ถูกลบ — หน้าเว็บซ่อนประกาศที่เลยวันแสดงผลเองสำหรับผู้อ่านทั่วไป
+function listNews_() {
+  return readRows_(SHEET_NEWS, NEWS_HEADERS).filter(n => str_(n.status) !== 'deleted').map(newsOut_);
+}
+
+function findNews_(id) {
+  const n = readRows_(SHEET_NEWS, NEWS_HEADERS).filter(x => str_(x.id) === String(id) && str_(x.status) !== 'deleted')[0];
+  if (!n) throw new Error('ไม่พบประกาศ');
+  return newsOut_(n);
+}
+
+function newsImageData_(id) {
+  const n = findNews_(id);
+  if (!n.imageFileId) throw new Error('ประกาศนี้ไม่มีรูป');
+  const blob = DriveApp.getFileById(n.imageFileId).getBlob();
+  return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+}
+
+// image: base64 ของ JPEG ที่ย่อแล้ว (ไม่ส่ง = คงรูปเดิม), removeImage: true = ลบรูป
+function saveNews_(b) {
+  const user = requireSession_(b.token, 'news');
+  const now = new Date().toISOString();
+  const link = String(b.link || '').trim();
+  if (link && !/^https?:\/\/\S+$/i.test(link)) throw new Error('ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://');
+  const v = {
+    title: clean_(b.title, 200), body: clean_(b.body, 5000),
+    category: NEWS_CATEGORIES.indexOf(b.category) >= 0 ? b.category : 'general',
+    pinned: b.pinned === true ? 'true' : 'false', link: link.slice(0, 500),
+    showUntil: /^\d{4}-\d{2}-\d{2}$/.test(b.showUntil || '') ? b.showUntil : '', updatedAt: now,
+  };
+  if (!v.title) throw new Error('กรุณาระบุหัวข้อประกาศ');
+  const cur = b.id ? findNews_(b.id) : null;
+  const trash = (fileId) => { try { if (fileId) DriveApp.getFileById(fileId).setTrashed(true); } catch (_) { /* ถูกลบไปแล้ว */ } };
+  if (b.image) {
+    const data = String(b.image);
+    if (!/^[A-Za-z0-9+\/=]+$/.test(data)) throw new Error('ไฟล์รูปไม่ถูกต้อง');
+    const bytes = Utilities.base64Decode(data);
+    if (bytes.length > GALLERY_MAX_BYTES) throw new Error('ไฟล์รูปใหญ่เกินไป');
+    const folder = childFolder_(newsRoot_(), beYear_(now.slice(0, 10)));
+    const file = folder.createFile(Utilities.newBlob(bytes, 'image/jpeg', v.title.replace(/[\/\\]/g, '-').slice(0, 120) + '.jpg'));
+    if (cur) trash(cur.imageFileId);
+    Object.assign(v, { imageFileId: file.getId(), thumb: cleanThumb_(b.thumb), public: shareFile_(file) });
+  } else if (b.removeImage && cur) {
+    trash(cur.imageFileId);
+    Object.assign(v, { imageFileId: '', thumb: '', public: 'false' });
+  }
+  const sheet = sheet_(SHEET_NEWS);
+  if (cur) {
+    const row = findRow_(SHEET_NEWS, cur.id);
+    const old = sheet.getRange(row, 1, 1, NEWS_HEADERS.length).getValues()[0];
+    sheet.getRange(row, 1, 1, NEWS_HEADERS.length).setValues([NEWS_HEADERS.map((h, i) => h in v ? v[h] : old[i])]);
+    return { id: cur.id };
+  }
+  const id = Utilities.getUuid();
+  Object.assign(v, { id, status: 'active', createdByName: user.name, createdAt: now });
+  sheet.appendRow(NEWS_HEADERS.map(h => h in v ? v[h] : ''));
+  return { id };
+}
+
+function deleteNews_(b) {
+  requireSession_(b.token, 'news');
+  const n = findNews_(b.id);
+  sheet_(SHEET_NEWS).getRange(findRow_(SHEET_NEWS, n.id), NEWS_HEADERS.indexOf('status') + 1).setValue('deleted');
+  try { if (n.imageFileId) DriveApp.getFileById(n.imageFileId).setTrashed(true); } catch (_) { /* ถูกลบไปแล้ว */ }
   return true;
 }
