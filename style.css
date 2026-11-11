@@ -934,3 +934,8 @@ html.lb-on, html.lb-on body { overflow: hidden; }
   .ct-files li input { grid-column: 1 / -1; grid-row: 2; }
   .ct-stage { inset: 52px 4px 8px; }
 }
+.ct-cover { background: linear-gradient(135deg, #f6f1df, #eef3ef); }
+.ct-cover img { object-fit: contain; padding: 10px; }
+.ct-ev .ct-cat { align-self: flex-start; }
+.ct-hit { color: var(--green-700) !important; font-weight: 600; }
+.ct-grid .ct-cap { text-align: center; }

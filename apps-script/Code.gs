@@ -35,7 +35,8 @@ const SHEET_PHOTOS = 'Photos';
 const SHEET_ADVISORS = 'Advisors';
 const SHEET_ALBUMS = 'Albums';
 const SHEET_GPHOTOS = 'GalleryPhotos';
-const SHEET_CERTS = 'Certificates';
+const SHEET_CERT_EVENTS = 'CertEvents';
+const SHEET_CERTS = 'CertFiles';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
@@ -75,9 +76,9 @@ const ALBUM_HEADERS = ['id', 'title', 'date', 'detail', 'folderId', 'status', 'c
 const GPHOTO_HEADERS = ['id', 'albumId', 'fileId', 'thumb', 'public', 'createdByName', 'createdAt'];
 const GALLERY_ROOT_NAME = 'คลังภาพสภานักเรียน';
 const GALLERY_MAX_BYTES = 8 * 1024 * 1024;
-// คลังเกียรติบัตร: ไฟล์ PDF/รูปเก็บใน Drive (คลังเกียรติบัตรสภานักเรียน / ปี พ.ศ.) ส่วนชีตเก็บข้อมูลและรูปย่อ
-const CERT_HEADERS = ['id', 'title', 'recipient', 'issuer', 'date', 'category', 'fileId', 'mime', 'thumb', 'public', 'status',
-  'createdByName', 'createdAt', 'updatedAt'];
+// คลังเกียรติบัตร: จัดเป็นงาน/กิจกรรม — ไฟล์ PDF/รูปเก็บใน Drive (คลังเกียรติบัตรสภานักเรียน / ปี พ.ศ. / วันที่ ชื่องาน)
+const CERT_EVENT_HEADERS = ['id', 'title', 'date', 'issuer', 'category', 'detail', 'folderId', 'status', 'createdByName', 'createdAt', 'updatedAt'];
+const CERT_HEADERS = ['id', 'eventId', 'recipient', 'fileId', 'mime', 'thumb', 'public', 'createdByName', 'createdAt'];
 const CERT_CATEGORIES = ['award', 'join', 'thanks', 'other'];
 const CERT_ROOT_NAME = 'คลังเกียรติบัตรสภานักเรียน';
 const CERT_MAX_BYTES = 10 * 1024 * 1024;
@@ -113,7 +114,11 @@ function setup() {
   ensure(SHEET_ADVISORS, ADVISOR_HEADERS, true);
   ensure(SHEET_ALBUMS, ALBUM_HEADERS, true);
   ensure(SHEET_GPHOTOS, GPHOTO_HEADERS, true);
+  ensure(SHEET_CERT_EVENTS, CERT_EVENT_HEADERS, true);
   ensure(SHEET_CERTS, CERT_HEADERS, true);
+  // ชีตรุ่นแรก (ยังไม่เคยมีข้อมูล) ถูกแทนด้วย CertEvents + CertFiles
+  const oldCerts = ss.getSheetByName('Certificates');
+  if (oldCerts && oldCerts.getLastRow() <= 1) ss.deleteSheet(oldCerts);
   galleryRoot_(); // สร้างโฟลเดอร์คลังภาพใน Drive (ครั้งแรกจะขอสิทธิ์เข้าถึง Drive)
   certRoot_();
   if (!findUser_(ADMIN_USERNAME)) {
@@ -138,7 +143,8 @@ function doGet(e) {
     if (action === 'albums') return json_({ ok: true, data: listAlbums_() });
     if (action === 'album') return json_({ ok: true, data: getAlbum_(e.parameter.id) });
     if (action === 'gphoto') return json_({ ok: true, data: galleryPhotoData_(e.parameter.id) });
-    if (action === 'certs') return json_({ ok: true, data: listCerts_() });
+    if (action === 'certEvents') return json_({ ok: true, data: listCertEvents_() });
+    if (action === 'certEvent') return json_({ ok: true, data: getCertEvent_(e.parameter.id) });
     if (action === 'certFile') return json_({ ok: true, data: certFileData_(e.parameter.id) });
     return json_({ ok: false, error: 'ไม่รู้จักคำสั่ง' });
   } catch (err) {
@@ -162,6 +168,7 @@ function doPost(e) {
       submitFeedback: submitFeedback_, trackFeedback: trackFeedback_, listFeedback: listFeedback_, updateFeedback: updateFeedback_,
       saveAlbum: saveAlbum_, deleteAlbum: deleteAlbum_, uploadGalleryPhoto: uploadGalleryPhoto_,
       deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_, setAlbumCover: setAlbumCover_,
+      saveCertEvent: saveCertEvent_, deleteCertEvent: deleteCertEvent_,
       uploadCert: uploadCert_, updateCert: updateCert_, deleteCert: deleteCert_,
     };
     const fn = handlers[body.action];
@@ -1183,20 +1190,42 @@ function certRoot_() {
   return f;
 }
 
-const certOut_ = (c) => ({
-  id: str_(c.id), title: str_(c.title), recipient: str_(c.recipient), issuer: str_(c.issuer), date: str_(c.date),
-  category: CERT_CATEGORIES.indexOf(str_(c.category)) >= 0 ? str_(c.category) : 'other', fileId: str_(c.fileId),
-  mime: str_(c.mime), thumb: str_(c.thumb), public: str_(c.public) === 'true',
+const certEventOut_ = (e) => ({
+  id: str_(e.id), title: str_(e.title), date: str_(e.date), issuer: str_(e.issuer), detail: str_(e.detail), folderId: str_(e.folderId),
+  category: CERT_CATEGORIES.indexOf(str_(e.category)) >= 0 ? str_(e.category) : 'other',
 });
+const certOut_ = (c) => ({ id: str_(c.id), recipient: str_(c.recipient), fileId: str_(c.fileId), mime: str_(c.mime), thumb: str_(c.thumb), public: str_(c.public) === 'true' });
 
-function listCerts_() {
-  return readRows_(SHEET_CERTS, CERT_HEADERS).filter(c => str_(c.status) !== 'deleted').map(certOut_);
+// รายการงาน พร้อมจำนวน รูปปก และรายชื่อผู้ได้รับ (ใช้ค้นหาด้วยชื่อคนข้ามทุกงาน)
+function listCertEvents_() {
+  const by = {};
+  readRows_(SHEET_CERTS, CERT_HEADERS).forEach(c => {
+    const id = str_(c.eventId);
+    const g = by[id] = by[id] || { count: 0, cover: '', names: [] };
+    g.count++;
+    g.names.push(str_(c.recipient));
+    if (!g.cover && str_(c.thumb)) g.cover = str_(c.thumb);
+  });
+  return readRows_(SHEET_CERT_EVENTS, CERT_EVENT_HEADERS).filter(e => str_(e.status) !== 'deleted')
+    .map(e => Object.assign(certEventOut_(e), by[str_(e.id)] || { count: 0, cover: '', names: [] }));
+}
+
+function findCertEvent_(id) {
+  const e = readRows_(SHEET_CERT_EVENTS, CERT_EVENT_HEADERS).filter(x => str_(x.id) === String(id) && str_(x.status) !== 'deleted')[0];
+  if (!e) throw new Error('ไม่พบงาน/กิจกรรม');
+  return certEventOut_(e);
+}
+
+function getCertEvent_(id) {
+  const ev = findCertEvent_(id);
+  ev.certs = readRows_(SHEET_CERTS, CERT_HEADERS).filter(c => str_(c.eventId) === ev.id).map(certOut_);
+  return ev;
 }
 
 function findCert_(id) {
-  const c = readRows_(SHEET_CERTS, CERT_HEADERS).filter(x => str_(x.id) === String(id) && str_(x.status) !== 'deleted')[0];
+  const c = readRows_(SHEET_CERTS, CERT_HEADERS).filter(x => str_(x.id) === String(id))[0];
   if (!c) throw new Error('ไม่พบเกียรติบัตร');
-  return certOut_(c);
+  return Object.assign(certOut_(c), { eventId: str_(c.eventId) });
 }
 
 // ไฟล์เต็มสำหรับดู/ดาวน์โหลด — เฉพาะไฟล์ที่ลงทะเบียนในคลังเท่านั้น
@@ -1206,48 +1235,72 @@ function certFileData_(id) {
   return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
 }
 
-function certFields_(b) {
+const certEventFolderName_ = (v) => `${v.date} ${v.title}`.replace(/[\/\\]/g, '-').slice(0, 180);
+const certFileName_ = (recipient, mime) => String(recipient).replace(/[\/\\]/g, '-').slice(0, 150) + (mime === 'application/pdf' ? '.pdf' : '.jpg');
+
+function saveCertEvent_(b) {
+  const user = requireSession_(b.token, 'certs');
   const v = {
-    title: clean_(b.title, 200), recipient: clean_(b.recipient, 150), issuer: clean_(b.issuer, 150), date: String(b.date || ''),
-    category: CERT_CATEGORIES.indexOf(b.category) >= 0 ? b.category : 'other',
+    title: clean_(b.title, 200), date: String(b.date || ''), issuer: clean_(b.issuer, 150), detail: clean_(b.detail, 1000),
+    category: CERT_CATEGORIES.indexOf(b.category) >= 0 ? b.category : 'other', updatedAt: new Date().toISOString(),
   };
-  if (!v.title) throw new Error('กรุณาระบุชื่อรายการเกียรติบัตร');
-  if (!v.recipient) throw new Error('กรุณาระบุชื่อผู้ได้รับ');
+  if (!v.title) throw new Error('กรุณาระบุชื่องาน/กิจกรรม');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) throw new Error('วันที่ไม่ถูกต้อง');
-  return v;
+  const sheet = sheet_(SHEET_CERT_EVENTS);
+  if (b.id) {
+    const cur = findCertEvent_(b.id);
+    const row = findRow_(SHEET_CERT_EVENTS, cur.id);
+    try {
+      const folder = DriveApp.getFolderById(cur.folderId);
+      folder.setName(certEventFolderName_(v));
+      if (beYear_(cur.date) !== beYear_(v.date)) folder.moveTo(childFolder_(certRoot_(), beYear_(v.date)));
+    } catch (_) { /* โฟลเดอร์ถูกลบใน Drive */ }
+    const old = sheet.getRange(row, 1, 1, CERT_EVENT_HEADERS.length).getValues()[0];
+    sheet.getRange(row, 1, 1, CERT_EVENT_HEADERS.length).setValues([CERT_EVENT_HEADERS.map((h, i) => h in v ? v[h] : old[i])]);
+    return { id: cur.id };
+  }
+  const folder = childFolder_(childFolder_(certRoot_(), beYear_(v.date)), certEventFolderName_(v));
+  const id = Utilities.getUuid();
+  Object.assign(v, { id, folderId: folder.getId(), status: 'active', createdByName: user.name, createdAt: v.updatedAt });
+  sheet.appendRow(CERT_EVENT_HEADERS.map(h => v[h]));
+  return { id };
 }
-const certFileName_ = (v) => `${v.date} ${v.title} - ${v.recipient}`.replace(/[\/\\]/g, '-').slice(0, 180);
+
+// ลบงาน: ย้ายโฟลเดอร์ทั้งงานไปถังขยะของ Drive (กู้คืนได้ภายใน 30 วัน)
+function deleteCertEvent_(b) {
+  requireSession_(b.token, 'certs');
+  const ev = findCertEvent_(b.id);
+  sheet_(SHEET_CERT_EVENTS).getRange(findRow_(SHEET_CERT_EVENTS, ev.id), CERT_EVENT_HEADERS.indexOf('status') + 1).setValue('deleted');
+  try { DriveApp.getFolderById(ev.folderId).setTrashed(true); } catch (_) { /* โฟลเดอร์ถูกลบไปแล้ว */ }
+  return true;
+}
 
 // อัปโหลดทีละไฟล์: data = base64 ของไฟล์ (PDF หรือ JPEG ที่ย่อแล้ว), thumb = รูปย่อหน้าแรก (data URL)
 function uploadCert_(b) {
   const user = requireSession_(b.token, 'certs');
-  const v = certFields_(b);
+  const ev = findCertEvent_(b.eventId);
+  const recipient = clean_(b.recipient, 150);
+  if (!recipient) throw new Error('กรุณาระบุชื่อผู้ได้รับ');
   const mime = b.mime === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
   const data = String(b.data || '');
   if (!/^[A-Za-z0-9+\/=]+$/.test(data)) throw new Error('ไฟล์ไม่ถูกต้อง');
   const bytes = Utilities.base64Decode(data);
   if (bytes.length > CERT_MAX_BYTES) throw new Error('ไฟล์ใหญ่เกิน 10 MB');
-  const folder = childFolder_(certRoot_(), beYear_(v.date));
-  const file = folder.createFile(Utilities.newBlob(bytes, mime, certFileName_(v) + (mime === 'application/pdf' ? '.pdf' : '.jpg')));
-  const now = new Date().toISOString();
-  const row = Object.assign(v, { id: Utilities.getUuid(), fileId: file.getId(), mime, thumb: cleanThumb_(b.thumb), public: shareFile_(file),
-    status: 'active', createdByName: user.name, createdAt: now, updatedAt: now });
+  const file = DriveApp.getFolderById(ev.folderId).createFile(Utilities.newBlob(bytes, mime, certFileName_(recipient, mime)));
+  const row = { id: Utilities.getUuid(), eventId: ev.id, recipient, fileId: file.getId(), mime, thumb: cleanThumb_(b.thumb),
+    public: shareFile_(file), createdByName: user.name, createdAt: new Date().toISOString() };
   sheet_(SHEET_CERTS).appendRow(CERT_HEADERS.map(h => row[h]));
   return certOut_(row);
 }
 
+// แก้ชื่อผู้ได้รับ
 function updateCert_(b) {
   requireSession_(b.token, 'certs');
-  const cur = findCert_(b.id);
-  const v = Object.assign(certFields_(b), { updatedAt: new Date().toISOString() });
-  const row = findRow_(SHEET_CERTS, cur.id), sheet = sheet_(SHEET_CERTS);
-  const old = sheet.getRange(row, 1, 1, CERT_HEADERS.length).getValues()[0];
-  sheet.getRange(row, 1, 1, CERT_HEADERS.length).setValues([CERT_HEADERS.map((h, i) => h in v ? v[h] : old[i])]);
-  try {
-    const file = DriveApp.getFileById(cur.fileId);
-    file.setName(certFileName_(v) + (cur.mime === 'application/pdf' ? '.pdf' : '.jpg'));
-    if (beYear_(cur.date) !== beYear_(v.date)) file.moveTo(childFolder_(certRoot_(), beYear_(v.date)));
-  } catch (_) { /* ไฟล์ถูกลบใน Drive */ }
+  const c = findCert_(b.id);
+  const recipient = clean_(b.recipient, 150);
+  if (!recipient) throw new Error('กรุณาระบุชื่อผู้ได้รับ');
+  sheet_(SHEET_CERTS).getRange(findRow_(SHEET_CERTS, c.id), CERT_HEADERS.indexOf('recipient') + 1).setValue(recipient);
+  try { DriveApp.getFileById(c.fileId).setName(certFileName_(recipient, c.mime)); } catch (_) { /* ไฟล์ถูกลบใน Drive */ }
   return true;
 }
 
@@ -1255,7 +1308,7 @@ function updateCert_(b) {
 function deleteCert_(b) {
   requireSession_(b.token, 'certs');
   const c = findCert_(b.id);
-  sheet_(SHEET_CERTS).getRange(findRow_(SHEET_CERTS, c.id), CERT_HEADERS.indexOf('status') + 1).setValue('deleted');
   try { DriveApp.getFileById(c.fileId).setTrashed(true); } catch (_) { /* ไฟล์ถูกลบไปแล้ว */ }
+  sheet_(SHEET_CERTS).deleteRow(findRow_(SHEET_CERTS, c.id));
   return true;
 }
