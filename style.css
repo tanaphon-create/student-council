@@ -1131,3 +1131,50 @@ html.lb-on, html.lb-on body { overflow: hidden; }
 .lk-atable tr.is-hidden td { opacity: .55; }
 .lk-atable .danger { color: #b42318; }
 .lk-admin .table-wrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+
+/* ลอยกระทง: ปิดระบบ / ป้ายหน้าแรก / หน้าต่างชวน */
+.lk-builder.is-closed form { display: none; }
+.lk-builder.is-closed { grid-template-columns: 1fr; }
+.lk-builder.is-closed .lk-stage { display: none; }
+.lk-closed { text-align: center; padding: 28px 16px; }
+.lk-closed span { font-size: 44px; display: block; }
+.lk-closed b { display: block; font-size: 20px; color: var(--green-700); margin: 6px 0; }
+.lk-closed p { margin: 0; color: var(--muted); }
+.lk-switch { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 12px; margin: 6px 0 14px; padding: 12px 14px; border-radius: 12px; background: #f6f8f6; cursor: pointer; }
+.lk-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.lk-switch-ui { grid-row: span 2; width: 48px; height: 28px; border-radius: 999px; background: #c9d2cd; position: relative; transition: background .2s; }
+.lk-switch-ui::after { content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .2s; }
+.lk-switch input:checked + .lk-switch-ui { background: var(--green-600, #19a055); }
+.lk-switch input:checked + .lk-switch-ui::after { transform: translateX(20px); }
+.lk-switch input:focus-visible + .lk-switch-ui { outline: 2px solid var(--gold-500, #e0b53a); outline-offset: 2px; }
+.lk-switch small { color: var(--muted); }
+.home-krathong { margin-top: 18px; }
+.lk-banner { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 14px 22px 14px 14px; border-radius: 18px; text-decoration: none; color: #fff;
+  background: radial-gradient(circle at 88% 20%, rgba(255, 236, 170, .35), transparent 30%), linear-gradient(135deg, #0b1640, #2a2463 55%, #0c3445); box-shadow: 0 10px 28px rgba(12, 20, 60, .3); position: relative; overflow: hidden; transition: transform .18s; }
+.lk-banner:hover { transform: translateY(-2px); }
+.lk-banner::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(#fff 1px, transparent 1.5px); background-size: 46px 46px; opacity: .25; pointer-events: none; }
+.lk-banner-k { position: relative; animation: lkBob 3s ease-in-out infinite; }
+.lk-banner-t { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.lk-banner-t small { color: #f6dc8f; }
+.lk-banner-t b { font-family: 'Charm', 'Prompt', serif; font-size: 30px; line-height: 1.2; color: #ffe7a3; }
+.lk-banner-t span { color: #dfe6ff; font-size: 14px; }
+.lk-banner-go { position: relative; background: linear-gradient(#ffd76a, #e0a82e); color: #3b2500; font-weight: 700; padding: 10px 18px; border-radius: 999px; white-space: nowrap; }
+.lk-promo { position: fixed; z-index: 200; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(460px, calc(100vw - 24px)); display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 14px 16px; border-radius: 20px; color: #fff; background: linear-gradient(135deg, #0b1640, #2a2463 60%, #0c3445); box-shadow: 0 18px 40px rgba(0, 0, 0, .35); border: 1px solid rgba(255, 215, 106, .45);
+  animation: lkPromoIn .5s cubic-bezier(.2, 1.3, .4, 1) both; }
+.lk-promo.out { animation: lkPromoOut .3s ease-in both; }
+@keyframes lkPromoIn { from { transform: translate(-50%, 140%); opacity: 0; } }
+@keyframes lkPromoOut { to { transform: translate(-50%, 140%); opacity: 0; } }
+.lk-promo-k { animation: lkBob 3s ease-in-out infinite; }
+.lk-promo-t { display: flex; flex-direction: column; gap: 4px; }
+.lk-promo-t b { font-size: 18px; color: #ffe7a3; }
+.lk-promo-t span { font-size: 14px; color: #dfe6ff; line-height: 1.45; }
+.lk-promo-t .btn { align-self: flex-start; margin-top: 6px; }
+.lk-promo-x { position: absolute; right: 8px; top: 6px; border: 0; background: none; color: #fff; font-size: 24px; line-height: 1; cursor: pointer; opacity: .8; }
+@media (max-width: 640px) {
+  .lk-banner { grid-template-columns: 70px minmax(0, 1fr); padding: 12px; }
+  .lk-banner-go { grid-column: 1 / -1; text-align: center; }
+  .lk-banner-t b { font-size: 24px; }
+  .lk-promo { grid-template-columns: 80px minmax(0, 1fr); bottom: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .lk-banner-k, .lk-promo-k, .lk-promo { animation: none; } }

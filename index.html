@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=26">
+  <link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
   <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บ และเมื่อกดหน้าแรก -->
@@ -114,6 +114,7 @@
       </div>
 
       <div class="wrap home-polls" id="homePolls" hidden></div>
+      <div class="wrap home-krathong" id="homeKrathong" hidden></div>
       <div class="wrap home-news" id="homeNews" hidden></div>
 
       <section class="wrap cal-section" id="calSection" aria-labelledby="calTitle">
@@ -298,6 +299,7 @@
       <div class="wrap lk-make" id="lkMake">
         <div class="card lk-builder">
           <div class="lk-stage"><div class="lk-preview" id="lkPreview"></div><p>ตัวอย่างกระทงของคุณ</p></div>
+          <div class="lk-closed" id="lkClosed" hidden><span aria-hidden="true">🌙</span><b>ขณะนี้ปิดรับลอยกระทงแล้ว</b><p>ขอบคุณทุกคนที่ร่วมลอยกระทงกับสภานักเรียน ยังดูกระทงและคำอธิษฐานของเพื่อน ๆ บนแม่น้ำได้นะ</p></div>
           <form id="lkForm" autocomplete="off">
             <div class="lk-formhead"><h2>ตกแต่งกระทงของคุณ</h2><button type="button" class="btn btn-ghost btn-sm" id="lkRandom">🎲 สุ่มให้</button></div>
             <fieldset><legend>ฐานกระทง</legend><div class="lk-opts" id="lkBases"></div></fieldset>
@@ -326,6 +328,8 @@
         </div>
         <div class="card lk-admin" id="lkAdmin" hidden>
           <div class="lk-admin-head"><h2>🛠️ จัดการกระทง (ผู้ดูแลระบบ)</h2><span class="hint" id="lkAdminCount"></span></div>
+          <label class="lk-switch"><input type="checkbox" id="lkOpenToggle" checked><span class="lk-switch-ui" aria-hidden="true"></span><b id="lkOpenLabel">เปิดรับลอยกระทงอยู่</b>
+            <small>ปิดแล้วนักเรียนจะลอยไม่ได้ และเมนู การ์ด ป้ายชวนในหน้าแรกจะถูกซ่อน</small></label>
           <input type="search" id="lkAdminQ" placeholder="ค้นหาชื่อ ชั้น เลขประจำตัว หรือคำอธิษฐาน" aria-label="ค้นหากระทง">
           <div class="table-wrap"><table class="lk-atable"><thead><tr><th>ชื่อ</th><th>ชั้น</th><th>เลขประจำตัว</th><th>คำอธิษฐาน</th><th>เวลา</th><th></th></tr></thead><tbody id="lkAdminBody"></tbody></table></div>
         </div>
@@ -394,6 +398,6 @@
   <script src="gallery.js?v=2"></script>
   <script src="certs.js?v=2"></script>
   <script src="news.js?v=1"></script>
-  <script src="krathong.js?v=6"></script>
+  <script src="krathong.js?v=7"></script>
 </body>
 </html>

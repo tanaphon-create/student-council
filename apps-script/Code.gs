@@ -159,6 +159,7 @@ function doGet(e) {
     if (action === 'album') return json_({ ok: true, data: getAlbum_(e.parameter.id) });
     if (action === 'gphoto') return json_({ ok: true, data: galleryPhotoData_(e.parameter.id) });
     if (action === 'krathongs') return json_({ ok: true, data: listKrathongs_() });
+    if (action === 'krathongStatus') return json_({ ok: true, data: krathongStatus_() });
     if (action === 'news') return json_({ ok: true, data: listNews_() });
     if (action === 'newsImage') return json_({ ok: true, data: newsImageData_(e.parameter.id) });
     if (action === 'certEvents') return json_({ ok: true, data: listCertEvents_() });
@@ -189,6 +190,7 @@ function doPost(e) {
       saveCertEvent: saveCertEvent_, deleteCertEvent: deleteCertEvent_,
       saveNews: saveNews_, deleteNews: deleteNews_,
       floatKrathong: floatKrathong_, hideKrathong: hideKrathong_, adminKrathongs: adminKrathongs_, deleteKrathong: deleteKrathong_,
+      setKrathongOpen: setKrathongOpen_,
       uploadCert: uploadCert_, updateCert: updateCert_, deleteCert: deleteCert_,
     };
     const fn = handlers[body.action];
@@ -1436,9 +1438,25 @@ function rudeWord_(text) {
 const hexColor_ = (v, d) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : d;
 
 // กระทงทุกใบ (แสดงบนแม่น้ำตามจำนวนจริง) — คำอธิษฐานส่งเฉพาะใบที่เจ้าของเลือกให้แสดง ไม่ส่งรหัสเครื่องออกไป
+// เปิด/ปิดรับลอยกระทง (ค่าเริ่มต้น = เปิด) เก็บใน Script Properties
+const krathongOpen_ = () => PropertiesService.getScriptProperties().getProperty('KRATHONG_OPEN') !== 'false';
+
+// สถานะแบบเบา ๆ สำหรับหน้าแรก (ไม่ต้องอ่านกระทงทุกใบ)
+function krathongStatus_() {
+  const s = sheet_(SHEET_KRATHONG);
+  return { open: krathongOpen_(), total: Math.max(s.getLastRow() - 1, 0) };
+}
+
+function setKrathongOpen_(b) {
+  requireSession_(b.token, true);
+  PropertiesService.getScriptProperties().setProperty('KRATHONG_OPEN', b.open === true ? 'true' : 'false');
+  return { open: b.open === true };
+}
+
 function listKrathongs_() {
   const rows = readRows_(SHEET_KRATHONG, KRATHONG_HEADERS).filter(k => str_(k.status) !== 'hidden');
   return {
+    open: krathongOpen_(),
     total: rows.length,
     items: rows.map(k => {
       const show = str_(k.showWish) === 'true';
@@ -1468,6 +1486,7 @@ function deleteKrathong_(b) {
 
 function floatKrathong_(b) {
   if (b.website) throw new Error('ลอยกระทงไม่สำเร็จ'); // ช่องดักบอต
+  if (!krathongOpen_()) throw new Error('ขณะนี้ปิดรับลอยกระทงแล้ว ขอบคุณที่ร่วมกิจกรรมนะ 🪷');
   const dev = String(b.deviceId || '');
   if (!/^[A-Za-z0-9-]{8,64}$/.test(dev)) throw new Error('ไม่สามารถระบุเครื่องได้ กรุณาเปิดหน้าเว็บใหม่');
   const cache = CacheService.getScriptCache(), ck = 'kt_' + dev;

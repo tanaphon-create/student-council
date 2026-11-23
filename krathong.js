@@ -348,7 +348,74 @@
     const data = await SC.apiGet('krathongs');
     ks.items = data.items;
     ks.total = data.total;
+    setOpen(data.open !== false);
   }
+
+  /* ================= เปิด/ปิดระบบ ================= */
+  // ปิดระบบ: ลอยไม่ได้ ซ่อนเมนู การ์ด และป้ายชวนในหน้าแรก (ผู้ดูแลยังเข้าหน้านี้ได้)
+  function setOpen(open) {
+    ks.open = open;
+    const show = open || isAdmin();
+    $$('a[href="#krathong"]').forEach(a => (a.hidden = !show));
+    $('#lkClosed').hidden = open;
+    $('.lk-builder').classList.toggle('is-closed', !open);
+    $$('input, select, textarea, button', $('#lkForm')).forEach(el => (el.disabled = !open));
+    $('#lkCta').hidden = !open;
+    const t = $('#lkOpenToggle');
+    if (t) { t.checked = open; $('#lkOpenLabel').textContent = open ? 'เปิดรับลอยกระทงอยู่' : 'ปิดรับลอยกระทงแล้ว'; }
+    if (!open) { const b = $('#lkPromo'); if (b) b.remove(); }
+    homeBanner();
+  }
+  async function toggleOpen(e) {
+    const want = e.target.checked;
+    if (!confirm(want ? 'เปิดรับลอยกระทงให้นักเรียนลอยได้?' : 'ปิดรับลอยกระทง? นักเรียนจะลอยไม่ได้ และเมนูลอยกระทงจะถูกซ่อน')) { e.target.checked = !want; return; }
+    e.target.disabled = true;
+    try { await SC.authed({ action: 'setKrathongOpen', open: want }); setOpen(want); toast(want ? 'เปิดรับลอยกระทงแล้ว' : 'ปิดรับลอยกระทงแล้ว'); } catch (err) { e.target.checked = !want; toast(err.message, true); }
+    e.target.disabled = false;
+  }
+
+  /* ================= หน้าแรก: ป้ายชวนและหน้าต่างเด้ง ================= */
+  function homeBanner() {
+    const box = $('#homeKrathong');
+    box.hidden = !ks.open;
+    if (!ks.open) return;
+    box.innerHTML = `<a class="lk-banner" href="#krathong">
+      <span class="lk-banner-k">${krathongSvg({ base: 'lotus', petal: '#f06292', flower: '#ffd54f', deco: 'jasmine,sparkle,fireflies' })}</span>
+      <span class="lk-banner-t"><small>📣 ประกาศจากสภานักเรียน</small><b>ร่วมลอยกระทงออนไลน์</b><span>ตกแต่งกระทงของตัวเอง เขียนคำอธิษฐาน แล้วลอยไปพร้อมเพื่อน ๆ${ks.total ? ` · ลอยแล้ว ${ks.total.toLocaleString('th-TH')} กระทง` : ''}</span></span>
+      <span class="lk-banner-go">ลอยกระทง →</span></a>`;
+  }
+  function promo() {
+    // รอให้ INTRO จบก่อน แสดงครั้งเดียวต่อการเปิดเว็บ
+    if (document.getElementById('intro')) { document.addEventListener('sc:intro-done', promo, { once: true }); return; }
+    if (!ks.open || $('#lkPromo') || !['', '#', '#home'].includes(location.hash)) return;
+    try { if (sessionStorage.getItem('sc_lk_promo')) return; } catch (_) { /* ไม่มี storage */ }
+    // หน้าต่างแจ้งงานวันนี้ (ปฏิทิน) เด้งอยู่: รอให้ปิดก่อน ไม่ให้ซ้อนกัน
+    if (SC.dialog.open) { setTimeout(promo, 600); return; }
+    try { sessionStorage.setItem('sc_lk_promo', '1'); } catch (_) { /* ไม่มี storage */ }
+    const el = document.createElement('div');
+    el.id = 'lkPromo';
+    el.className = 'lk-promo';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'ชวนลอยกระทงออนไลน์');
+    el.innerHTML = `<button class="lk-promo-x" aria-label="ปิด">×</button>
+      <div class="lk-promo-k">${krathongSvg({ base: 'leaf', petal: '#f06292', flower: '#ffd54f', deco: 'bunny,hearts,fireflies' })}</div>
+      <div class="lk-promo-t"><b>🪷 มาลอยกระทงกันเถอะ!</b><span>ตกแต่งกระทงน่ารัก ๆ เขียนคำอธิษฐาน แล้วลอยไปพร้อมเพื่อนทั้งโรงเรียน</span>
+        <a class="btn btn-gold" href="#krathong">ไปลอยกระทง</a></div>`;
+    document.body.append(el);
+    const close = () => { el.classList.add('out'); setTimeout(() => el.remove(), 300); };
+    $('.lk-promo-x', el).onclick = close;
+    $('a', el).onclick = close;
+    window.addEventListener('hashchange', close, { once: true });
+  }
+  async function status() {
+    try { const s = await SC.apiGet('krathongStatus'); ks.total = Math.max(ks.total, s.total); setOpen(s.open); } catch (_) { /* ไว้ลองใหม่รอบหน้า */ }
+  }
+  document.addEventListener('sc:home', async () => {
+    await SC.prime(async (get) => { const s = get('krathongStatus'); ks.total = s.total; setOpen(s.open); });
+    await status();
+    // เผื่อเวลาให้หน้าต่างแจ้งงานวันนี้เด้งก่อน แล้วค่อยต่อคิว
+    setTimeout(promo, 1200);
+  });
   document.addEventListener('sc:krathong', async () => {
     buildScene();
     renderBuilder();
@@ -369,6 +436,10 @@
   $('#lkForm').number.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
   $('#lkForm').name.addEventListener('input', preview);
   $('#lkAdminQ').addEventListener('input', renderAdmin);
+  $('#lkOpenToggle').addEventListener('change', toggleOpen);
+  document.addEventListener('sc:auth', () => { if (ks.open !== undefined) setOpen(ks.open); });
+  // ตั้งค่าเมนูตามสถานะล่าสุดที่จำไว้ในเครื่องทันทีที่เปิดเว็บ แล้วค่อยเช็คของจริง
+  SC.prime(async (get) => { const s = get('krathongStatus'); ks.total = s.total; setOpen(s.open); });
   document.addEventListener('sc:auth', () => { if (!$('#page-krathong').hidden) { loadAdmin(); renderRiver(); } });
   $('#lkScene').addEventListener('click', closeBubble);
   $('#lkCta').addEventListener('click', (e) => { e.stopPropagation(); $('#lkMake').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth' }); });
@@ -389,11 +460,14 @@
   };
   ext.krathongs = (db) => {
     const rows = demoList(db).filter(k => k.status !== 'hidden');
-    return JSON.parse(JSON.stringify({ total: rows.length, items: rows.map(({ number, ...k }) => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
+    return JSON.parse(JSON.stringify({ open: db.krathongOpen !== false, total: rows.length, items: rows.map(({ number, ...k }) => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
   };
   ext.adminKrathongs = (db, b, sess) => { sess(true); return JSON.parse(JSON.stringify(demoList(db).map(k => ({ ...k, hidden: k.status === 'hidden' })))); };
   ext.deleteKrathong = (db, b, sess) => { sess(true); db.krathongs = demoList(db).filter(k => k.id !== b.id); return true; };
+  ext.krathongStatus = (db) => ({ open: db.krathongOpen !== false, total: demoList(db).length });
+  ext.setKrathongOpen = (db, b, sess) => { sess(true); db.krathongOpen = b.open === true; return { open: db.krathongOpen }; };
   ext.floatKrathong = (db, b) => {
+    if (db.krathongOpen === false) throw new Error('ขณะนี้ปิดรับลอยกระทงแล้ว ขอบคุณที่ร่วมกิจกรรมนะ 🪷');
     if (!/^\d{5}$/.test(String(b.number || ''))) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน 5 หลัก');
     if (!String(b.name || '').trim()) throw new Error('กรุณากรอกชื่อ');
     if (!/^ม\.[1-6]\/([1-9]|1[0-9]|20)$/.test(String(b.classroom || ''))) throw new Error('กรุณาเลือกชั้น เช่น ม.1/1');
