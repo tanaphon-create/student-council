@@ -20,7 +20,6 @@
     coin: 'เหรียญ',
     leaves: 'ใบไม้เพิ่ม',
   };
-  const MAX_ON_RIVER = 40;
   const ks = { items: null, total: 0, mine: new Set(), built: false, timer: null,
     design: { base: 'leaf', petal: PETALS[0], flower: FLOWERS[0], deco: ['jasmine'] } };
   const store = {
@@ -126,34 +125,28 @@
     }).join('');
   }
 
-  function riverItems() {
-    const list = ks.items.slice(-MAX_ON_RIVER);
-    // ให้กระทงของตัวเองอยู่บนแม่น้ำเสมอ แม้จะเก่ากว่า 40 ใบล่าสุด
-    ks.items.forEach(k => { if (ks.mine.has(k.id) && !list.includes(k)) list.unshift(k); });
-    // แม่น้ำโล่งเกินไป: เติมกระทงประดับ (ไม่มีคำอธิษฐาน กดไม่ได้)
-    for (let i = list.length; i < 6; i++) {
-      const r = seeded('amb' + i);
-      list.push({ id: 'amb' + i, ambient: true, base: Object.keys(BASES)[i % 4], petal: PETALS[Math.floor(r() * PETALS.length)], flower: FLOWERS[Math.floor(r() * FLOWERS.length)], deco: i % 2 ? 'jasmine' : 'sparkle' });
-    }
-    return list;
-  }
-
+  // แสดงกระทงทุกใบตามจำนวนที่ลอยจริง — ยิ่งมากยิ่งย่อขนาดลงและกระจายหลายแถว ให้แม่น้ำไม่แน่นเกินไป
   function renderRiver(fresh) {
     const box = $('#lkRiver');
-    const lanes = 5;
-    box.innerHTML = riverItems().map((k, i) => {
+    const n = ks.items.length;
+    const lanes = n > 120 ? 9 : n > 40 ? 7 : 5;
+    const size = n > 300 ? 0.55 : n > 120 ? 0.7 : n > 40 ? 0.85 : 1;
+    // กระทงจำนวนมาก: ปิดการโยกตัวเพื่อให้มือถือไม่หน่วง (ยังลอยไปตามน้ำเหมือนเดิม)
+    box.classList.toggle('is-crowded', n > 150);
+    $('#lkEmpty').hidden = n > 0;
+    box.innerHTML = ks.items.map((k) => {
       const r = seeded(k.id);
       const lane = Math.floor(r() * lanes);
       const depth = lane / (lanes - 1); // 0 = ไกล, 1 = ใกล้
       const dur = (reduced() ? 160 : 70) + r() * 50 - depth * 20;
       const mine = ks.mine.has(k.id);
       const delay = k.id === fresh ? 0 : -(r() * dur);
-      return `<button class="lk-k ${mine ? 'is-mine' : ''} ${k.ambient ? 'is-amb' : ''} ${k.id === fresh ? 'is-new' : ''}" data-id="${esc(k.id)}"
-        style="top:${(8 + depth * 62).toFixed(1)}%;--w:${(64 + depth * 76).toFixed(0)}px;--dur:${dur.toFixed(0)}s;animation-delay:${delay.toFixed(1)}s;z-index:${10 + lane};--bob:${(2.5 + r() * 2).toFixed(1)}s"
-        ${k.ambient ? 'tabindex="-1" aria-hidden="true"' : `aria-label="กระทง${k.number ? ' เลขประจำตัว ' + esc(k.number) : ''}${k.name ? ' ของ ' + esc(k.name) : ''}"`}>
+      return `<button class="lk-k ${mine ? 'is-mine' : ''} ${k.id === fresh ? 'is-new' : ''}" data-id="${esc(k.id)}"
+        style="top:${(8 + depth * 62).toFixed(1)}%;--w:${((64 + depth * 76) * size).toFixed(0)}px;--dur:${dur.toFixed(0)}s;animation-delay:${delay.toFixed(1)}s;z-index:${10 + lane};--bob:${(2.5 + r() * 2).toFixed(1)}s"
+        aria-label="กระทง${k.number ? ' เลขประจำตัว ' + esc(k.number) : ''}${k.name ? ' ของ ' + esc(k.name) : ''}">
         <span class="lk-bob">${krathongSvg(k, { label: mine ? 'กระทงของฉัน' : '' })}</span><span class="lk-refl"></span></button>`;
     }).join('');
-    $$('.lk-k:not(.is-amb)', box).forEach(b => (b.onclick = (e) => { e.stopPropagation(); bubble(b, ks.items.find(k => k.id === b.dataset.id)); }));
+    $$('.lk-k', box).forEach(b => (b.onclick = (e) => { e.stopPropagation(); bubble(b, ks.items.find(k => k.id === b.dataset.id)); }));
     $('#lkCount').textContent = ks.total.toLocaleString('th-TH');
     renderWishes();
   }
@@ -277,7 +270,7 @@
   };
   ext.krathongs = (db) => {
     const rows = demoList(db).filter(k => k.status !== 'hidden');
-    return JSON.parse(JSON.stringify({ total: rows.length, items: rows.slice(-300).map(k => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
+    return JSON.parse(JSON.stringify({ total: rows.length, items: rows.map(k => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
   };
   ext.floatKrathong = (db, b) => {
     if (!/^\d{3,8}$/.test(String(b.number || ''))) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');

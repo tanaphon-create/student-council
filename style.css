@@ -1099,3 +1099,5 @@ html.lb-on, html.lb-on body { overflow: hidden; }
   .lk-stars i, .lk-moon, .lk-moonpath, .lk-wave, .lk-bob, .lk-flame, .lk-glow, .lk-refl, .lk-ember, .lk-sparkle, .lk-preview { animation: none; }
   .lk-lanterns { display: none; }
 }
+.lk-river.is-crowded .lk-bob, .lk-river.is-crowded .lk-refl, .lk-river.is-crowded .lk-glow, .lk-river.is-crowded .lk-flame { animation: none; }
+.lk-empty-river { position: absolute; left: 0; right: 0; top: 38%; margin: 0; text-align: center; color: #cfe8ef; font-size: 17px; opacity: .85; padding: 0 16px; }

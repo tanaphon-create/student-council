@@ -1420,12 +1420,12 @@ function deleteNews_(b) {
 /* ---------- ลอยกระทงออนไลน์ ---------- */
 const hexColor_ = (v, d) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : d;
 
-// กระทงล่าสุด 300 ใบ — คำอธิษฐานส่งเฉพาะใบที่เจ้าของเลือกให้แสดง ไม่ส่งรหัสเครื่องออกไป
+// กระทงทุกใบ (แสดงบนแม่น้ำตามจำนวนจริง) — คำอธิษฐานส่งเฉพาะใบที่เจ้าของเลือกให้แสดง ไม่ส่งรหัสเครื่องออกไป
 function listKrathongs_() {
   const rows = readRows_(SHEET_KRATHONG, KRATHONG_HEADERS).filter(k => str_(k.status) !== 'hidden');
   return {
     total: rows.length,
-    items: rows.slice(-300).map(k => {
+    items: rows.map(k => {
       const show = str_(k.showWish) === 'true';
       return { id: str_(k.id), base: str_(k.base), petal: str_(k.petal), flower: str_(k.flower), deco: str_(k.deco),
         number: str_(k.number), name: str_(k.name), wish: show ? str_(k.wish) : '', showWish: show, createdAt: str_(k.createdAt) };
