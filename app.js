@@ -575,7 +575,7 @@
   /* ================= router ================= */
   function route() {
     let [r, param] = (location.hash || '#home').slice(1).split('/');
-    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee', 'gallery', 'certs', 'news'].includes(r)) r = 'home';
+    if (!['home', 'calendar', 'finance', 'members', 'duty', 'vote', 'feedback', 'committee', 'gallery', 'certs', 'news', 'krathong'].includes(r)) r = 'home';
     if (r === 'members' && !isAdmin()) r = 'finance';
     const page = r === 'calendar' ? 'home' : r; // ปฏิทินอยู่ในหน้าแรก
     $$('.page').forEach(p => (p.hidden = p.id !== 'page-' + page));
@@ -588,6 +588,7 @@
     if (r === 'gallery') document.dispatchEvent(new CustomEvent('sc:gallery', { detail: param || '' }));
     if (r === 'certs') document.dispatchEvent(new CustomEvent('sc:certs', { detail: param || '' }));
     if (r === 'news') document.dispatchEvent(new CustomEvent('sc:news', { detail: param || '' }));
+    if (r === 'krathong') document.dispatchEvent(new CustomEvent('sc:krathong'));
     window.scrollTo(0, 0);
     if (page === 'home') document.dispatchEvent(new CustomEvent('sc:home', { detail: { scroll: r === 'calendar' } }));
   }

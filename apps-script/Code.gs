@@ -38,6 +38,7 @@ const SHEET_GPHOTOS = 'GalleryPhotos';
 const SHEET_CERT_EVENTS = 'CertEvents';
 const SHEET_CERTS = 'CertFiles';
 const SHEET_NEWS = 'News';
+const SHEET_KRATHONG = 'Krathongs';
 
 const TX_HEADERS = ['id', 'no', 'date', 'type', 'amount', 'source', 'detail',
   'recorderUsername', 'recorderName', 'createdAt', 'status', 'voidReason', 'voidByName', 'voidAt'];
@@ -88,6 +89,10 @@ const NEWS_HEADERS = ['id', 'title', 'body', 'category', 'pinned', 'link', 'show
   'createdByName', 'createdAt', 'updatedAt'];
 const NEWS_CATEGORIES = ['general', 'event', 'urgent', 'recruit'];
 const NEWS_ROOT_NAME = 'ประกาศสภานักเรียน';
+// ลอยกระทงออนไลน์: ทุกคนลอยได้โดยไม่ต้องเข้าสู่ระบบ (จำกัดต่อเครื่อง) ผู้ดูแลซ่อนกระทงที่ไม่เหมาะสมได้
+const KRATHONG_HEADERS = ['id', 'base', 'petal', 'flower', 'deco', 'number', 'wish', 'name', 'showWish', 'deviceId', 'status', 'createdAt'];
+const KRATHONG_BASES = ['leaf', 'bread', 'lotus', 'coconut'];
+const KRATHONG_LIMIT = 5; // ต่อเครื่องต่อชั่วโมง
 // ครูที่ปรึกษา: แยกจากรายชื่อนักเรียน (ไม่เข้าระบบเช็คชื่อ) แสดงบนสุดของทำเนียบ
 const ADVISOR_HEADERS = ['id', 'name', 'position', 'sort', 'active', 'updatedByName', 'updatedAt'];
 
@@ -128,6 +133,7 @@ function setup() {
   galleryRoot_(); // สร้างโฟลเดอร์คลังภาพใน Drive (ครั้งแรกจะขอสิทธิ์เข้าถึง Drive)
   certRoot_();
   ensure(SHEET_NEWS, NEWS_HEADERS, true);
+  ensure(SHEET_KRATHONG, KRATHONG_HEADERS, true);
   newsRoot_();
   if (!findUser_(ADMIN_USERNAME)) {
     const salt = Utilities.getUuid();
@@ -151,6 +157,7 @@ function doGet(e) {
     if (action === 'albums') return json_({ ok: true, data: listAlbums_() });
     if (action === 'album') return json_({ ok: true, data: getAlbum_(e.parameter.id) });
     if (action === 'gphoto') return json_({ ok: true, data: galleryPhotoData_(e.parameter.id) });
+    if (action === 'krathongs') return json_({ ok: true, data: listKrathongs_() });
     if (action === 'news') return json_({ ok: true, data: listNews_() });
     if (action === 'newsImage') return json_({ ok: true, data: newsImageData_(e.parameter.id) });
     if (action === 'certEvents') return json_({ ok: true, data: listCertEvents_() });
@@ -180,6 +187,7 @@ function doPost(e) {
       deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_, setAlbumCover: setAlbumCover_,
       saveCertEvent: saveCertEvent_, deleteCertEvent: deleteCertEvent_,
       saveNews: saveNews_, deleteNews: deleteNews_,
+      floatKrathong: floatKrathong_, hideKrathong: hideKrathong_,
       uploadCert: uploadCert_, updateCert: updateCert_, deleteCert: deleteCert_,
     };
     const fn = handlers[body.action];
@@ -1406,5 +1414,51 @@ function deleteNews_(b) {
   const n = findNews_(b.id);
   sheet_(SHEET_NEWS).getRange(findRow_(SHEET_NEWS, n.id), NEWS_HEADERS.indexOf('status') + 1).setValue('deleted');
   try { if (n.imageFileId) DriveApp.getFileById(n.imageFileId).setTrashed(true); } catch (_) { /* ถูกลบไปแล้ว */ }
+  return true;
+}
+
+/* ---------- ลอยกระทงออนไลน์ ---------- */
+const hexColor_ = (v, d) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : d;
+
+// กระทงล่าสุด 300 ใบ — คำอธิษฐานส่งเฉพาะใบที่เจ้าของเลือกให้แสดง ไม่ส่งรหัสเครื่องออกไป
+function listKrathongs_() {
+  const rows = readRows_(SHEET_KRATHONG, KRATHONG_HEADERS).filter(k => str_(k.status) !== 'hidden');
+  return {
+    total: rows.length,
+    items: rows.slice(-300).map(k => {
+      const show = str_(k.showWish) === 'true';
+      return { id: str_(k.id), base: str_(k.base), petal: str_(k.petal), flower: str_(k.flower), deco: str_(k.deco),
+        number: str_(k.number), name: str_(k.name), wish: show ? str_(k.wish) : '', showWish: show, createdAt: str_(k.createdAt) };
+    }),
+  };
+}
+
+function floatKrathong_(b) {
+  if (b.website) throw new Error('ลอยกระทงไม่สำเร็จ'); // ช่องดักบอต
+  const dev = String(b.deviceId || '');
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(dev)) throw new Error('ไม่สามารถระบุเครื่องได้ กรุณาเปิดหน้าเว็บใหม่');
+  const cache = CacheService.getScriptCache(), ck = 'kt_' + dev;
+  const sent = Number(cache.get(ck) || 0);
+  if (sent >= KRATHONG_LIMIT) throw new Error('ลอยกระทงครบ ' + KRATHONG_LIMIT + ' ใบแล้ว ลองใหม่อีกครั้งในอีก 1 ชั่วโมง');
+  const wish = clean_(b.wish, 300);
+  if (!wish) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
+  const row = {
+    id: Utilities.getUuid(), base: KRATHONG_BASES.indexOf(b.base) >= 0 ? b.base : 'leaf',
+    petal: hexColor_(b.petal, '#f06292'), flower: hexColor_(b.flower, '#ffd54f'),
+    deco: String(b.deco || '').split(',').filter(x => /^[a-z]{2,12}$/.test(x)).slice(0, 5).join(','),
+    number: clean_(String(b.number || '').replace(/[^0-9A-Za-zก-๙ \-\/]/g, ''), 12), wish, name: clean_(b.name, 40),
+    showWish: b.showWish === true ? 'true' : 'false', deviceId: dev, status: 'active', createdAt: new Date().toISOString(),
+  };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { sheet_(SHEET_KRATHONG).appendRow(KRATHONG_HEADERS.map(h => row[h])); } finally { lock.releaseLock(); }
+  cache.put(ck, String(sent + 1), 3600);
+  return { id: row.id };
+}
+
+// ผู้ดูแลระบบ หรือผู้มีสิทธิ์ประกาศข่าว ซ่อนกระทงที่ข้อความไม่เหมาะสม
+function hideKrathong_(b) {
+  requireSession_(b.token, 'news');
+  sheet_(SHEET_KRATHONG).getRange(findRow_(SHEET_KRATHONG, b.id), KRATHONG_HEADERS.indexOf('status') + 1).setValue('hidden');
   return true;
 }

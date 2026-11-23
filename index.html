@@ -8,8 +8,8 @@
   <link rel="icon" href="assets/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=22">
+  <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
   <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บ และเมื่อกดหน้าแรก -->
@@ -73,6 +73,7 @@
         <a href="#vote" data-route="vote">โหวต</a>
         <a href="#feedback" data-route="feedback">ความคิดเห็น</a>
         <a href="#committee" data-route="committee">ทำเนียบ</a>
+        <a href="#krathong" data-route="krathong">ลอยกระทง</a>
         <a href="#news" data-route="news">ประกาศ</a>
         <a href="#gallery" data-route="gallery">คลังภาพ</a>
         <a href="#certs" data-route="certs">เกียรติบัตร</a>
@@ -138,6 +139,7 @@
             <p>กำหนดงาน วัน เวลา และสมาชิก หัวหน้าเช็คชื่อรายวันหรือเช็ครวม พร้อมสรุปผลทุกคน</p>
             <span class="tag tag-live">เปิดใช้งาน</span>
           </a>
+          <a class="feature active feature-lk" href="#krathong"><span class="f-icon">🪷</span><h3>ลอยกระทงออนไลน์</h3><p>ตกแต่งกระทงของตัวเอง ใส่เลขและคำอธิษฐาน แล้วลอยไปพร้อมกระทงของเพื่อน ๆ ทั้งโรงเรียน</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#news"><span class="f-icon">📣</span><h3>ข่าวประชาสัมพันธ์</h3><p>ประกาศและข่าวสารกิจกรรมของสภานักเรียน ปักหมุดเรื่องสำคัญ แนบรูปและลิงก์ได้</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#calendar"><span class="f-icon">📅</span><h3>ปฏิทินการปฏิบัติงาน</h3><p>กำหนดการประชุม กิจกรรม และเวรปฏิบัติงาน บันทึกโดยประธานนักเรียนและครู</p><span class="tag tag-live">เปิดใช้งาน</span></a>
           <a class="feature active" href="#feedback"><span class="f-icon">💬</span><h3>รับฟังความคิดเห็น</h3><p>ส่งข้อเสนอแนะ เรื่องร้องเรียน หรือคำชื่นชมถึงสภา ไม่ต้องระบุชื่อก็ได้ พร้อมรหัสติดตามเรื่อง</p><span class="tag tag-live">เปิดใช้งาน</span></a>
@@ -262,6 +264,64 @@
       <div class="wrap" id="galleryView"></div>
     </section>
 
+    <!-- ลอยกระทงออนไลน์ -->
+    <section class="page lk-page" id="page-krathong" hidden>
+      <div class="lk-scene" id="lkScene">
+        <div class="lk-sky">
+          <div class="lk-stars" id="lkStars"></div>
+          <div class="lk-moon"></div>
+          <div class="lk-lanterns" id="lkLanterns"></div>
+        </div>
+        <div class="lk-title">
+          <p>คณะกรรมการสภานักเรียน · โรงเรียนวังจันทร์วิทยา</p>
+          <h1>ลอยกระทงออนไลน์</h1>
+          <span class="lk-counter">ลอยแล้ว <b id="lkCount">0</b> กระทง</span>
+        </div>
+        <svg class="lk-bank" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 120 V78 Q90 62 180 74 T360 70 Q430 58 520 72 T720 66 Q820 54 900 70 T1080 64 Q1150 60 1200 70 V120Z" fill="#071a22"/>
+          <g fill="#05141b">
+            <path d="M640 72 V56 h4 v-6 h3 v-5 q3 -14 6 -20 l1.5 -14 l1.5 14 q3 6 6 20 v5 h3 v6 h4 V72Z"/>
+            <path d="M600 72 v-10 h10 v-4 l7 -8 l7 8 v4 h10 v10Z"/>
+            <path d="M150 74 q-4 -20 2 -36 q-10 4 -16 -2 q10 -2 14 -6 q-12 -4 -14 -12 q12 4 18 6 q0 -10 4 -16 q2 10 0 16 q8 -6 18 -4 q-8 6 -16 10 q10 2 16 10 q-10 0 -18 -4 q4 16 0 38Z"/>
+            <path d="M1000 68 q-3 -18 2 -32 q-9 3 -14 -2 q9 -2 12 -5 q-10 -4 -12 -10 q10 3 16 5 q0 -9 3 -14 q2 9 0 14 q7 -5 16 -3 q-7 5 -14 9 q9 2 14 9 q-9 0 -16 -4 q3 14 0 33Z"/>
+            <ellipse cx="300" cy="72" rx="44" ry="16"/><ellipse cx="840" cy="68" rx="52" ry="18"/><ellipse cx="460" cy="72" rx="30" ry="11"/>
+          </g>
+        </svg>
+        <div class="lk-water">
+          <div class="lk-moonpath"></div>
+          <div class="lk-wave w1"></div><div class="lk-wave w2"></div><div class="lk-wave w3"></div>
+          <div class="lk-river" id="lkRiver"></div>
+        </div>
+        <button type="button" class="lk-cta" id="lkCta">ตกแต่งกระทงของคุณ ↓</button>
+      </div>
+      <div class="wrap lk-make" id="lkMake">
+        <div class="card lk-builder">
+          <div class="lk-stage"><div class="lk-preview" id="lkPreview"></div><p>ตัวอย่างกระทงของคุณ</p></div>
+          <form id="lkForm" autocomplete="off">
+            <h2>ตกแต่งกระทงของคุณ</h2>
+            <fieldset><legend>ฐานกระทง</legend><div class="lk-opts" id="lkBases"></div></fieldset>
+            <fieldset><legend>สีกลีบ</legend><div class="lk-sws" id="lkPetals"></div></fieldset>
+            <fieldset><legend>สีดอกไม้</legend><div class="lk-sws" id="lkFlowers"></div></fieldset>
+            <fieldset><legend>ของตกแต่ง <small>(เลือกได้หลายอย่าง)</small></legend><div class="lk-chips" id="lkDecos"></div></fieldset>
+            <div class="row2">
+              <div class="field"><label for="lk1">เลขบนกระทง <small>(ไม่บังคับ)</small></label><input id="lk1" name="number" maxlength="12" placeholder="เช่น เลขที่ 12 หรือเลขนำโชค"></div>
+              <div class="field"><label for="lk2">ชื่อ <small>(ไม่บังคับ)</small></label><input id="lk2" name="name" maxlength="40" placeholder="ชื่อเล่น หรือ ห้อง"></div>
+            </div>
+            <div class="field"><label for="lk3">คำอธิษฐาน</label><textarea id="lk3" name="wish" rows="3" maxlength="300" required placeholder="ขอให้…"></textarea></div>
+            <label class="chk"><input type="checkbox" name="showWish" checked> ให้เพื่อน ๆ เห็นคำอธิษฐานนี้ (ไม่ติ๊ก = เก็บเป็นความลับ)</label>
+            <input class="hp" name="website" tabindex="-1" aria-hidden="true">
+            <p class="err"></p>
+            <button type="submit" class="btn btn-gold lk-go">🪷 ลอยกระทง</button>
+          </form>
+        </div>
+        <div class="card lk-wishbox">
+          <h2>✨ คำอธิษฐานล่าสุด</h2>
+          <p class="hint">กดที่กระทงบนแม่น้ำเพื่ออ่านคำอธิษฐาน</p>
+          <ul class="lk-wishes" id="lkWishes"></ul>
+        </div>
+      </div>
+    </section>
+
     <!-- ประกาศ -->
     <section class="page" id="page-news" hidden>
       <div class="page-head">
@@ -315,7 +375,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="config.js?v=2"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
   <script src="duty.js?v=6"></script>
   <script src="calendar.js?v=4"></script>
   <script src="vote.js?v=2"></script>
@@ -324,5 +384,6 @@
   <script src="gallery.js?v=2"></script>
   <script src="certs.js?v=2"></script>
   <script src="news.js?v=1"></script>
+  <script src="krathong.js?v=2"></script>
 </body>
 </html>
