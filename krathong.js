@@ -177,6 +177,8 @@
         <span class="lk-bob">${krathongSvg(k, { label: mine ? 'กระทงของฉัน' : '' })}</span><span class="lk-refl"></span></button>`;
     }).join('');
     $$('.lk-k', box).forEach(b => (b.onclick = (e) => { e.stopPropagation(); bubble(b, ks.items.find(k => k.id === b.dataset.id)); }));
+    // นับจากกระทงที่อยู่บนแม่น้ำจริง (ไม่ใช้ตัวเลขเก่าที่จำไว้จากหน้าแรก)
+    ks.total = ks.items.length;
     $('#lkCount').textContent = ks.total.toLocaleString('th-TH');
     renderWishes();
   }
