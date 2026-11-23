@@ -304,7 +304,7 @@
             <fieldset><legend>สีดอกไม้</legend><div class="lk-sws" id="lkFlowers"></div></fieldset>
             <fieldset><legend>ของตกแต่ง <small>(เลือกได้หลายอย่าง)</small></legend><div class="lk-chips" id="lkDecos"></div></fieldset>
             <div class="row2">
-              <div class="field"><label for="lk1">เลขบนกระทง <small>(ไม่บังคับ)</small></label><input id="lk1" name="number" maxlength="12" placeholder="เช่น เลขที่ 12 หรือเลขนำโชค"></div>
+              <div class="field"><label for="lk1">เลขประจำตัวนักเรียน</label><input id="lk1" name="number" inputmode="numeric" pattern="[0-9]{3,8}" maxlength="8" required placeholder="เช่น 12345"></div>
               <div class="field"><label for="lk2">ชื่อ <small>(ไม่บังคับ)</small></label><input id="lk2" name="name" maxlength="40" placeholder="ชื่อเล่น หรือ ห้อง"></div>
             </div>
             <div class="field"><label for="lk3">คำอธิษฐาน</label><textarea id="lk3" name="wish" rows="3" maxlength="300" required placeholder="ขอให้…"></textarea></div>
@@ -384,6 +384,6 @@
   <script src="gallery.js?v=2"></script>
   <script src="certs.js?v=2"></script>
   <script src="news.js?v=1"></script>
-  <script src="krathong.js?v=2"></script>
+  <script src="krathong.js?v=3"></script>
 </body>
 </html>

@@ -1440,13 +1440,15 @@ function floatKrathong_(b) {
   const cache = CacheService.getScriptCache(), ck = 'kt_' + dev;
   const sent = Number(cache.get(ck) || 0);
   if (sent >= KRATHONG_LIMIT) throw new Error('ลอยกระทงครบ ' + KRATHONG_LIMIT + ' ใบแล้ว ลองใหม่อีกครั้งในอีก 1 ชั่วโมง');
+  const sid = String(b.number || '').trim();
+  if (!/^\d{3,8}$/.test(sid)) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');
   const wish = clean_(b.wish, 300);
   if (!wish) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
   const row = {
     id: Utilities.getUuid(), base: KRATHONG_BASES.indexOf(b.base) >= 0 ? b.base : 'leaf',
     petal: hexColor_(b.petal, '#f06292'), flower: hexColor_(b.flower, '#ffd54f'),
     deco: String(b.deco || '').split(',').filter(x => /^[a-z]{2,12}$/.test(x)).slice(0, 5).join(','),
-    number: clean_(String(b.number || '').replace(/[^0-9A-Za-zก-๙ \-\/]/g, ''), 12), wish, name: clean_(b.name, 40),
+    number: sid, wish, name: clean_(b.name, 40),
     showWish: b.showWish === true ? 'true' : 'false', deviceId: dev, status: 'active', createdAt: new Date().toISOString(),
   };
   const lock = LockService.getScriptLock();

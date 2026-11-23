@@ -150,7 +150,7 @@
       const delay = k.id === fresh ? 0 : -(r() * dur);
       return `<button class="lk-k ${mine ? 'is-mine' : ''} ${k.ambient ? 'is-amb' : ''} ${k.id === fresh ? 'is-new' : ''}" data-id="${esc(k.id)}"
         style="top:${(8 + depth * 62).toFixed(1)}%;--w:${(64 + depth * 76).toFixed(0)}px;--dur:${dur.toFixed(0)}s;animation-delay:${delay.toFixed(1)}s;z-index:${10 + lane};--bob:${(2.5 + r() * 2).toFixed(1)}s"
-        ${k.ambient ? 'tabindex="-1" aria-hidden="true"' : `aria-label="กระทง${k.number ? ' เลข ' + esc(k.number) : ''}${k.name ? ' ของ ' + esc(k.name) : ''}"`}>
+        ${k.ambient ? 'tabindex="-1" aria-hidden="true"' : `aria-label="กระทง${k.number ? ' เลขประจำตัว ' + esc(k.number) : ''}${k.name ? ' ของ ' + esc(k.name) : ''}"`}>
         <span class="lk-bob">${krathongSvg(k, { label: mine ? 'กระทงของฉัน' : '' })}</span><span class="lk-refl"></span></button>`;
     }).join('');
     $$('.lk-k:not(.is-amb)', box).forEach(b => (b.onclick = (e) => { e.stopPropagation(); bubble(b, ks.items.find(k => k.id === b.dataset.id)); }));
@@ -164,7 +164,7 @@
     const scene = $('#lkScene'), rect = btn.getBoundingClientRect(), sr = scene.getBoundingClientRect();
     const b = document.createElement('div');
     b.className = 'lk-bubble';
-    b.innerHTML = `${k.number ? `<span class="lk-num">เลข ${esc(k.number)}</span>` : ''}
+    b.innerHTML = `${k.number ? `<span class="lk-num">เลขประจำตัว ${esc(k.number)}</span>` : ''}
       <p>${k.wish ? '“' + esc(k.wish) + '”' : '<i>เจ้าของกระทงเก็บคำอธิษฐานไว้เป็นความลับ</i>'}</p>
       <small>${k.name ? esc(k.name) : 'ไม่ระบุชื่อ'}${ks.mine.has(k.id) ? ' · กระทงของคุณ' : ''}</small>
       ${can('news') ? '<button class="lk-hide">ซ่อนกระทงนี้</button>' : ''}`;
@@ -182,7 +182,7 @@
 
   function renderWishes() {
     const list = ks.items.filter(k => k.wish).slice(-12).reverse();
-    $('#lkWishes').innerHTML = list.length ? list.map(k => `<li><span class="lk-wk">${krathongSvg(k)}</span><div><p>“${esc(k.wish)}”</p><small>${k.name ? esc(k.name) : 'ไม่ระบุชื่อ'}${k.number ? ' · เลข ' + esc(k.number) : ''}</small></div></li>`).join('')
+    $('#lkWishes').innerHTML = list.length ? list.map(k => `<li><span class="lk-wk">${krathongSvg(k)}</span><div><p>“${esc(k.wish)}”</p><small>${k.name ? esc(k.name) : 'ไม่ระบุชื่อ'}${k.number ? ' · เลขประจำตัว ' + esc(k.number) : ''}</small></div></li>`).join('')
       : '<li class="lk-empty">ยังไม่มีคำอธิษฐานที่เปิดให้เห็น มาเป็นคนแรกกันเถอะ</li>';
   }
 
@@ -205,7 +205,8 @@
     e.preventDefault();
     const f = $('#lkForm'), btn = $('button[type=submit]', f), err = $('.err', f);
     err.textContent = '';
-    const wish = f.wish.value.trim();
+    const wish = f.wish.value.trim(), sid = f.number.value.trim();
+    if (!/^\d{3,8}$/.test(sid)) { err.textContent = 'กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)'; f.number.focus(); return; }
     if (!wish) { err.textContent = 'อย่าลืมเขียนคำอธิษฐานนะ'; f.wish.focus(); return; }
     btn.disabled = true;
     const d = ks.design;
@@ -259,7 +260,7 @@
     }, 60000);
   });
   $('#lkForm').addEventListener('submit', launch);
-  $('#lkForm').number.addEventListener('input', preview);
+  $('#lkForm').number.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); preview(); });
   $('#lkScene').addEventListener('click', closeBubble);
   $('#lkCta').addEventListener('click', (e) => { e.stopPropagation(); $('#lkMake').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth' }); });
 
@@ -269,7 +270,7 @@
     if (!db.krathongs) {
       const wishes = ['ขอให้สอบผ่านทุกวิชา', 'ขอให้ครอบครัวมีสุขภาพแข็งแรง', 'ขอให้สภานักเรียนทำงานราบรื่น', 'ขอให้ติดมหาวิทยาลัยที่ใฝ่ฝัน', '', 'ขอให้เพื่อน ๆ มีความสุข', 'ขอให้ปีหน้าเกรดดีขึ้น', ''];
       db.krathongs = wishes.map((w, i) => ({ id: 'demo' + i, base: Object.keys(BASES)[i % 4], petal: PETALS[i % PETALS.length], flower: FLOWERS[i % FLOWERS.length],
-        deco: Object.keys(DECOS).filter((_, j) => (i + j) % 3 === 0).join(','), number: i % 3 === 0 ? String(10 + i * 7) : '', wish: w || 'ความลับ', name: i % 2 ? 'ม.5/' + (i % 7 + 1) : '',
+        deco: Object.keys(DECOS).filter((_, j) => (i + j) % 3 === 0).join(','), number: String(30101 + i * 37), wish: w || 'ความลับ', name: i % 2 ? 'ม.5/' + (i % 7 + 1) : '',
         showWish: !!w, status: 'active', createdAt: new Date(Date.now() - (8 - i) * 6e5).toISOString() }));
     }
     return db.krathongs;
@@ -279,6 +280,7 @@
     return JSON.parse(JSON.stringify({ total: rows.length, items: rows.slice(-300).map(k => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
   };
   ext.floatKrathong = (db, b) => {
+    if (!/^\d{3,8}$/.test(String(b.number || ''))) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');
     if (!String(b.wish || '').trim()) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
     const id = SC.uid();
     demoList(db).push({ id, base: BASES[b.base] ? b.base : 'leaf', petal: b.petal, flower: b.flower, deco: b.deco, number: String(b.number || '').slice(0, 12),
