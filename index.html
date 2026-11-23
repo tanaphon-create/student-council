@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
   <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บ และเมื่อกดหน้าแรก -->
@@ -305,9 +305,12 @@
             <fieldset><legend>สีดอกไม้</legend><div class="lk-sws" id="lkFlowers"></div></fieldset>
             <fieldset><legend>ของตกแต่ง <small>(เลือกได้สูงสุด 6 อย่าง)</small></legend><div id="lkDecos"></div></fieldset>
             <div class="row2">
-              <div class="field"><label for="lk1">เลขประจำตัวนักเรียน</label><input id="lk1" name="number" inputmode="numeric" pattern="[0-9]{3,8}" maxlength="8" required placeholder="เช่น 12345"></div>
-              <div class="field"><label for="lk2">ชื่อ <small>(ไม่บังคับ)</small></label><input id="lk2" name="name" maxlength="40" placeholder="ชื่อเล่น หรือ ห้อง"></div>
+              <div class="field"><label for="lk2">ชื่อ <small>(แสดงบนกระทง)</small></label><input id="lk2" name="name" maxlength="40" required placeholder="เช่น มะลิ ใจดี"></div>
+              <div class="field"><label for="lk4">ชั้น</label>
+                <div class="lk-class"><select id="lk4" name="level" required aria-label="ระดับชั้น"><option value="">ม.?</option><option value="1">ม.1</option><option value="2">ม.2</option><option value="3">ม.3</option><option value="4">ม.4</option><option value="5">ม.5</option><option value="6">ม.6</option></select>
+                <span>/</span><select id="lk5" name="room" required aria-label="ห้อง"><option value="">ห้อง</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option></select></div></div>
             </div>
+            <div class="field"><label for="lk1">เลขประจำตัวนักเรียน <small>(5 หลัก · ไม่แสดงให้คนอื่นเห็น)</small></label><input id="lk1" name="number" inputmode="numeric" pattern="[0-9]{5}" minlength="5" maxlength="5" required placeholder="เช่น 30512"></div>
             <div class="field"><label for="lk3">คำอธิษฐาน</label><textarea id="lk3" name="wish" rows="3" maxlength="300" required placeholder="ขอให้…"></textarea>
               <p class="lk-rude" id="lkRude" role="alert" hidden></p></div>
             <label class="chk"><input type="checkbox" name="showWish" checked> ให้เพื่อน ๆ เห็นคำอธิษฐานนี้ (ไม่ติ๊ก = เก็บเป็นความลับ)</label>
@@ -320,6 +323,11 @@
           <h2>✨ คำอธิษฐานล่าสุด</h2>
           <p class="hint">กดที่กระทงบนแม่น้ำเพื่ออ่านคำอธิษฐาน</p>
           <ul class="lk-wishes" id="lkWishes"></ul>
+        </div>
+        <div class="card lk-admin" id="lkAdmin" hidden>
+          <div class="lk-admin-head"><h2>🛠️ จัดการกระทง (ผู้ดูแลระบบ)</h2><span class="hint" id="lkAdminCount"></span></div>
+          <input type="search" id="lkAdminQ" placeholder="ค้นหาชื่อ ชั้น เลขประจำตัว หรือคำอธิษฐาน" aria-label="ค้นหากระทง">
+          <div class="table-wrap"><table class="lk-atable"><thead><tr><th>ชื่อ</th><th>ชั้น</th><th>เลขประจำตัว</th><th>คำอธิษฐาน</th><th>เวลา</th><th></th></tr></thead><tbody id="lkAdminBody"></tbody></table></div>
         </div>
       </div>
     </section>
@@ -386,6 +394,6 @@
   <script src="gallery.js?v=2"></script>
   <script src="certs.js?v=2"></script>
   <script src="news.js?v=1"></script>
-  <script src="krathong.js?v=5"></script>
+  <script src="krathong.js?v=6"></script>
 </body>
 </html>

@@ -1117,3 +1117,17 @@ html.lb-on, html.lb-on body { overflow: hidden; }
 @keyframes lkPaddle { 50% { transform: rotate(-6deg) translateY(-1px); } }
 .lk-river.is-crowded .lk-floaty, .lk-river.is-crowded .lk-flutter, .lk-river.is-crowded .lk-ff, .lk-river.is-crowded .lk-paddle { animation: none; }
 @media (prefers-reduced-motion: reduce) { .lk-floaty, .lk-flutter, .lk-ff, .lk-paddle { animation: none; } }
+.lk-class { display: flex; align-items: center; gap: 6px; }
+.lk-class select { flex: 1; min-width: 0; }
+.lk-class span { color: var(--muted); font-weight: 600; }
+.lk-admin { grid-column: 1 / -1; }
+.lk-admin-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.lk-admin #lkAdminQ { width: 100%; margin: 4px 0 12px; }
+.lk-atable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.lk-atable th, .lk-atable td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.lk-atable th { background: #f6f8f6; font-weight: 600; white-space: nowrap; }
+.lk-atable td:nth-child(2), .lk-atable td:nth-child(3), .lk-atable td:nth-child(5) { white-space: nowrap; }
+.lk-awish { min-width: 220px; overflow-wrap: anywhere; }
+.lk-atable tr.is-hidden td { opacity: .55; }
+.lk-atable .danger { color: #b42318; }
+.lk-admin .table-wrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }

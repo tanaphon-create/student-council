@@ -90,7 +90,8 @@ const NEWS_HEADERS = ['id', 'title', 'body', 'category', 'pinned', 'link', 'show
 const NEWS_CATEGORIES = ['general', 'event', 'urgent', 'recruit'];
 const NEWS_ROOT_NAME = 'ประกาศสภานักเรียน';
 // ลอยกระทงออนไลน์: ทุกคนลอยได้โดยไม่ต้องเข้าสู่ระบบ (จำกัดต่อเครื่อง) ผู้ดูแลซ่อนกระทงที่ไม่เหมาะสมได้
-const KRATHONG_HEADERS = ['id', 'base', 'petal', 'flower', 'deco', 'number', 'wish', 'name', 'showWish', 'deviceId', 'status', 'createdAt'];
+// number = เลขประจำตัวนักเรียน 5 หลัก เก็บไว้ให้ผู้ดูแลเท่านั้น ไม่ส่งออกให้คนทั่วไป
+const KRATHONG_HEADERS = ['id', 'base', 'petal', 'flower', 'deco', 'number', 'wish', 'name', 'showWish', 'deviceId', 'status', 'createdAt', 'classroom'];
 const KRATHONG_BASES = ['leaf', 'bread', 'lotus', 'coconut'];
 const KRATHONG_LIMIT = 5; // ต่อเครื่องต่อชั่วโมง
 // ครูที่ปรึกษา: แยกจากรายชื่อนักเรียน (ไม่เข้าระบบเช็คชื่อ) แสดงบนสุดของทำเนียบ
@@ -187,7 +188,7 @@ function doPost(e) {
       deleteGalleryPhoto: deleteGalleryPhoto_, syncAlbum: syncAlbum_, setGalleryThumb: setGalleryThumb_, setAlbumCover: setAlbumCover_,
       saveCertEvent: saveCertEvent_, deleteCertEvent: deleteCertEvent_,
       saveNews: saveNews_, deleteNews: deleteNews_,
-      floatKrathong: floatKrathong_, hideKrathong: hideKrathong_,
+      floatKrathong: floatKrathong_, hideKrathong: hideKrathong_, adminKrathongs: adminKrathongs_, deleteKrathong: deleteKrathong_,
       uploadCert: uploadCert_, updateCert: updateCert_, deleteCert: deleteCert_,
     };
     const fn = handlers[body.action];
@@ -1442,9 +1443,27 @@ function listKrathongs_() {
     items: rows.map(k => {
       const show = str_(k.showWish) === 'true';
       return { id: str_(k.id), base: str_(k.base), petal: str_(k.petal), flower: str_(k.flower), deco: str_(k.deco),
-        number: str_(k.number), name: str_(k.name), wish: show ? str_(k.wish) : '', showWish: show, createdAt: str_(k.createdAt) };
+        name: str_(k.name), classroom: str_(k.classroom), wish: show ? str_(k.wish) : '', showWish: show, createdAt: str_(k.createdAt) };
     }),
   };
+}
+
+// ผู้ดูแลระบบ: รายการกระทงทั้งหมด พร้อมเลขประจำตัวและคำอธิษฐานที่เก็บเป็นความลับ
+function adminKrathongs_(b) {
+  requireSession_(b.token, true);
+  return readRows_(SHEET_KRATHONG, KRATHONG_HEADERS).map(k => ({
+    id: str_(k.id), number: str_(k.number), name: str_(k.name), classroom: str_(k.classroom), wish: str_(k.wish),
+    showWish: str_(k.showWish) === 'true', hidden: str_(k.status) === 'hidden', createdAt: str_(k.createdAt),
+  }));
+}
+
+// ผู้ดูแลระบบลบกระทงออกถาวร
+function deleteKrathong_(b) {
+  requireSession_(b.token, true);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { sheet_(SHEET_KRATHONG).deleteRow(findRow_(SHEET_KRATHONG, b.id)); } finally { lock.releaseLock(); }
+  return true;
 }
 
 function floatKrathong_(b) {
@@ -1455,7 +1474,11 @@ function floatKrathong_(b) {
   const sent = Number(cache.get(ck) || 0);
   if (sent >= KRATHONG_LIMIT) throw new Error('ลอยกระทงครบ ' + KRATHONG_LIMIT + ' ใบแล้ว ลองใหม่อีกครั้งในอีก 1 ชั่วโมง');
   const sid = String(b.number || '').trim();
-  if (!/^\d{3,8}$/.test(sid)) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');
+  if (!/^\d{5}$/.test(sid)) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน 5 หลัก');
+  const name = clean_(b.name, 40);
+  if (!name) throw new Error('กรุณากรอกชื่อ');
+  const classroom = String(b.classroom || '').trim();
+  if (!/^ม\.[1-6]\/([1-9]|1[0-9]|20)$/.test(classroom)) throw new Error('กรุณาเลือกชั้น เช่น ม.1/1');
   const wish = clean_(b.wish, 300);
   if (!wish) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
   if (rudeWord_(b.wish) || rudeWord_(b.name)) throw new Error('ข้อความมีคำไม่สุภาพ กรุณาแก้ไขก่อนลอยกระทงนะ');
@@ -1463,7 +1486,7 @@ function floatKrathong_(b) {
     id: Utilities.getUuid(), base: KRATHONG_BASES.indexOf(b.base) >= 0 ? b.base : 'leaf',
     petal: hexColor_(b.petal, '#f06292'), flower: hexColor_(b.flower, '#ffd54f'),
     deco: String(b.deco || '').split(',').filter(x => /^[a-z]{2,12}$/.test(x)).slice(0, 6).join(','),
-    number: sid, wish, name: clean_(b.name, 40),
+    number: sid, wish, name, classroom,
     showWish: b.showWish === true ? 'true' : 'false', deviceId: dev, status: 'active', createdAt: new Date().toISOString(),
   };
   const lock = LockService.getScriptLock();

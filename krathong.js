@@ -56,7 +56,11 @@
     }
     return out;
   }
-  const BEAD_COLORS = ['#ef5350', '#ffca28', '#66bb6a', '#42a5f5', '#ab47bc', '#ff8a65'];
+  // ชื่อสั้นสำหรับธง: ตัดคำนำหน้า ใช้คำแรก ไม่เกิน 12 ตัวอักษร
+  const shortName = (n) => String(n || '').trim().replace(/^(นางสาว|นาย|นาง|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)\s*/, '').split(/\s+/)[0].slice(0, 12);
+  const whoOf = (k) => [k.name, k.classroom].filter(Boolean).map(esc).join(' · ') || 'ไม่ระบุชื่อ';
+  const isAdmin = () => !!(SC.state.session && SC.state.session.role === 'admin');
+  const BEAD_COLORS =['#ef5350', '#ffca28', '#66bb6a', '#42a5f5', '#ab47bc', '#ff8a65'];
   function starPath(cx, cy, r, fill, stroke) {
     const pts = Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; return `${(cx + Math.cos(a) * rr).toFixed(1)},${(cy + Math.sin(a) * rr).toFixed(1)}`; });
     return `<polygon points="${pts.join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width=".7" class="lk-sparkle"/>`;
@@ -118,8 +122,9 @@
     const cluster = [[60, 50, 7], [50, 54, 5.5], [70, 54, 5.5], [55, 46, 4.5], [66, 46, 4.5]]
       .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${flower}"/><circle cx="${x - r * 0.3}" cy="${y - r * 0.3}" r="${r * 0.45}" fill="${shade(flower, 1.15)}" opacity=".8"/>`).join('');
     const sparkle = deco.has('sparkle') ? [[30, 40], [92, 44], [80, 30], [40, 28]].map(([x, y]) => `<path d="M${x} ${y - 4} L${x + 1} ${y - 1} L${x + 4} ${y} L${x + 1} ${y + 1} L${x} ${y + 4} L${x - 1} ${y + 1} L${x - 4} ${y} L${x - 1} ${y - 1}Z" fill="#ffe082" class="lk-sparkle"/>`).join('') : '';
-    const number = String(d.number || '').trim();
-    const flag = number ? `<line x1="88" y1="58" x2="88" y2="22" stroke="#6d4c41" stroke-width="1.5"/>
+    // ธงบนกระทงแสดงชื่อ (ไม่แสดงเลขประจำตัว)
+    const number = shortName(d.name);
+    const flag = number ?`<line x1="88" y1="58" x2="88" y2="22" stroke="#6d4c41" stroke-width="1.5"/>
       <path d="M88 22 h${Math.max(18, number.length * 6.2 + 8)} l-4 6 l4 6 h-${Math.max(18, number.length * 6.2 + 8)}Z" fill="#ffd54f" stroke="#ff8f00" stroke-width=".8"/>
       <text x="${88 + Math.max(18, number.length * 6.2 + 8) / 2 - 1}" y="31.5" font-size="8.5" font-weight="700" text-anchor="middle" fill="#5d2e00" font-family="Prompt, sans-serif">${esc(number)}</text>` : '';
     return `<svg viewBox="0 0 ${number ? 140 : 120} 100" class="lk-svg" aria-hidden="true">
@@ -168,7 +173,7 @@
       const delay = k.id === fresh ? 0 : -(r() * dur);
       return `<button class="lk-k ${mine ? 'is-mine' : ''} ${k.id === fresh ? 'is-new' : ''}" data-id="${esc(k.id)}"
         style="top:${(8 + depth * 62).toFixed(1)}%;--w:${((64 + depth * 76) * size).toFixed(0)}px;--dur:${dur.toFixed(0)}s;animation-delay:${delay.toFixed(1)}s;z-index:${10 + lane};--bob:${(2.5 + r() * 2).toFixed(1)}s"
-        aria-label="กระทง${k.number ? ' เลขประจำตัว ' + esc(k.number) : ''}${k.name ? ' ของ ' + esc(k.name) : ''}">
+        aria-label="กระทง${k.name ? 'ของ ' + esc(k.name) : ''}${k.classroom ? ' ' + esc(k.classroom) : ''}">
         <span class="lk-bob">${krathongSvg(k, { label: mine ? 'กระทงของฉัน' : '' })}</span><span class="lk-refl"></span></button>`;
     }).join('');
     $$('.lk-k', box).forEach(b => (b.onclick = (e) => { e.stopPropagation(); bubble(b, ks.items.find(k => k.id === b.dataset.id)); }));
@@ -182,25 +187,64 @@
     const scene = $('#lkScene'), rect = btn.getBoundingClientRect(), sr = scene.getBoundingClientRect();
     const b = document.createElement('div');
     b.className = 'lk-bubble';
-    b.innerHTML = `${k.number ? `<span class="lk-num">เลขประจำตัว ${esc(k.number)}</span>` : ''}
+    const adm = ks.admin && ks.admin.find(x => x.id === k.id);
+    b.innerHTML = `<span class="lk-num">${whoOf(k)}</span>
       <p>${k.wish ? '“' + esc(k.wish) + '”' : '<i>เจ้าของกระทงเก็บคำอธิษฐานไว้เป็นความลับ</i>'}</p>
-      <small>${k.name ? esc(k.name) : 'ไม่ระบุชื่อ'}${ks.mine.has(k.id) ? ' · กระทงของคุณ' : ''}</small>
-      ${can('news') ? '<button class="lk-hide">ซ่อนกระทงนี้</button>' : ''}`;
+      <small>${ks.mine.has(k.id) ? 'กระทงของคุณ' : ''}${adm ? `${ks.mine.has(k.id) ? ' · ' : ''}เลขประจำตัว ${esc(adm.number)} (เห็นเฉพาะผู้ดูแล)` : ''}</small>
+      ${isAdmin() ? '<button class="lk-hide" data-del>ลบกระทงนี้</button>' : can('news') ? '<button class="lk-hide">ซ่อนกระทงนี้</button>' : ''}`;
     scene.append(b);
     const x = Math.min(Math.max(rect.left - sr.left + rect.width / 2, 130), sr.width - 130);
     b.style.left = x + 'px';
     b.style.top = Math.max(rect.top - sr.top - 8, 70) + 'px';
     const hide = $('.lk-hide', b);
-    if (hide) hide.onclick = async () => {
+    if (hide && hide.hasAttribute('data-del')) hide.onclick = () => removeKrathong(k.id);
+    else if (hide) hide.onclick = async () => {
       if (!confirm('ซ่อนกระทงนี้จากแม่น้ำ? (ใช้กับข้อความไม่เหมาะสม)')) return;
       try { await SC.authed({ action: 'hideKrathong', id: k.id }); ks.items = ks.items.filter(x2 => x2.id !== k.id); ks.total--; closeBubble(); renderRiver(); toast('ซ่อนกระทงแล้ว'); } catch (err) { toast(err.message, true); }
     };
+  }
+
+  // ผู้ดูแลระบบลบกระทงออกถาวร (ทั้งจากบนแม่น้ำและในตาราง)
+  async function removeKrathong(id) {
+    const k = (ks.admin || []).find(x => x.id === id) || ks.items.find(x => x.id === id) || {};
+    if (!confirm(`ลบกระทงของ ${k.name || 'ไม่ระบุชื่อ'}${k.classroom ? ' ' + k.classroom : ''} ออกถาวร?\nลบแล้วกู้คืนไม่ได้`)) return;
+    try {
+      await SC.authed({ action: 'deleteKrathong', id });
+      if (ks.items.some(x => x.id === id)) { ks.items = ks.items.filter(x => x.id !== id); ks.total--; }
+      if (ks.admin) ks.admin = ks.admin.filter(x => x.id !== id);
+      closeBubble();
+      renderRiver();
+      renderAdmin();
+      toast('ลบกระทงแล้ว');
+    } catch (err) { toast(err.message, true); }
+  }
+
+  /* ================= ตารางผู้ดูแลระบบ ================= */
+  async function loadAdmin() {
+    if (!isAdmin()) { ks.admin = null; renderAdmin(); return; }
+    try { ks.admin = await SC.authed({ action: 'adminKrathongs' }); } catch (err) { ks.admin = null; toast(err.message, true); }
+    renderAdmin();
+  }
+  function renderAdmin() {
+    const box = $('#lkAdmin');
+    box.hidden = !isAdmin() || !ks.admin;
+    if (box.hidden) return;
+    const q = ($('#lkAdminQ') && $('#lkAdminQ').value || '').trim().toLowerCase();
+    const list = [...ks.admin].reverse().filter(k => !q || [k.name, k.classroom, k.number, k.wish].join(' ').toLowerCase().includes(q));
+    $('#lkAdminBody').innerHTML = list.length ? list.map(k => `<tr${k.hidden ? ' class="is-hidden"' : ''}>
+        <td>${esc(k.name || '-')}</td><td>${esc(k.classroom || '-')}</td><td>${esc(k.number || '-')}</td>
+        <td class="lk-awish">${esc(k.wish)}${k.showWish ? '' : ' <span class="badge">ความลับ</span>'}${k.hidden ? ' <span class="badge">ถูกซ่อน</span>' : ''}</td>
+        <td>${new Date(k.createdAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</td>
+        <td><button class="btn-link danger" data-kdel="${esc(k.id)}">ลบ</button></td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">ไม่พบกระทง</td></tr>';
+    $('#lkAdminCount').textContent = `ทั้งหมด ${ks.admin.length.toLocaleString('th-TH')} ใบ`;
+    $$('[data-kdel]').forEach(b => (b.onclick = () => removeKrathong(b.dataset.kdel)));
   }
   const closeBubble = () => { const b = $('.lk-bubble'); if (b) b.remove(); };
 
   function renderWishes() {
     const list = ks.items.filter(k => k.wish).slice(-12).reverse();
-    $('#lkWishes').innerHTML = list.length ? list.map(k => `<li><span class="lk-wk">${krathongSvg(k)}</span><div><p>“${esc(k.wish)}”</p><small>${k.name ? esc(k.name) : 'ไม่ระบุชื่อ'}${k.number ? ' · เลขประจำตัว ' + esc(k.number) : ''}</small></div></li>`).join('')
+    $('#lkWishes').innerHTML = list.length ? list.map(k => `<li><span class="lk-wk">${krathongSvg(k)}</span><div><p>“${esc(k.wish)}”</p><small>${whoOf(k)}</small></div></li>`).join('')
       : '<li class="lk-empty">ยังไม่มีคำอธิษฐานที่เปิดให้เห็น มาเป็นคนแรกกันเถอะ</li>';
   }
 
@@ -255,26 +299,29 @@
     $('button[type=submit]', f).disabled = !!bad;
     return bad;
   }
-  const preview = () => { $('#lkPreview').innerHTML = krathongSvg({ ...ks.design, number: $('#lkForm').number.value }); };
+  const preview = () => { $('#lkPreview').innerHTML = krathongSvg({ ...ks.design, name: $('#lkForm').name.value }); };
+  const classroomOf = (f) => f.level.value && f.room.value ? `ม.${f.level.value}/${f.room.value}` : '';
 
   async function launch(e) {
     e.preventDefault();
     const f = $('#lkForm'), btn = $('button[type=submit]', f), err = $('.err', f);
     err.textContent = '';
-    const wish = f.wish.value.trim(), sid = f.number.value.trim();
-    if (!/^\d{3,8}$/.test(sid)) { err.textContent = 'กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)'; f.number.focus(); return; }
+    const wish = f.wish.value.trim(), sid = f.number.value.trim(), name = f.name.value.trim(), classroom = classroomOf(f);
+    if (!name) { err.textContent = 'กรุณากรอกชื่อ'; f.name.focus(); return; }
+    if (!classroom) { err.textContent = 'กรุณาเลือกชั้นและห้อง เช่น ม.1/1'; (f.level.value ? f.room : f.level).focus(); return; }
+    if (!/^\d{5}$/.test(sid)) { err.textContent = 'กรุณากรอกเลขประจำตัวนักเรียน 5 หลัก'; f.number.focus(); return; }
     if (!wish) { err.textContent = 'อย่าลืมเขียนคำอธิษฐานนะ'; f.wish.focus(); return; }
     if (checkRude()) return;
     btn.disabled = true;
     const d = ks.design;
-    const payload = { action: 'floatKrathong', base: d.base, petal: d.petal, flower: d.flower, deco: d.deco.join(','), number: f.number.value.trim(),
-      wish, name: f.name.value.trim(), showWish: f.showWish.checked, deviceId: deviceId(), website: f.website.value };
+    const payload = { action: 'floatKrathong', base: d.base, petal: d.petal, flower: d.flower, deco: d.deco.join(','), number: sid,
+      wish, name, classroom, showWish: f.showWish.checked, deviceId: deviceId(), website: f.website.value };
     try {
       const r = await SC.apiPost(payload);
       ks.mine.add(r.id);
       store.set('sc_my_krathongs', JSON.stringify([...ks.mine].slice(-30)));
-      const item = { id: r.id, base: payload.base, petal: payload.petal, flower: payload.flower, deco: payload.deco, number: payload.number,
-        name: payload.name, wish: payload.showWish ? wish : '', showWish: payload.showWish, createdAt: new Date().toISOString() };
+      const item = { id: r.id, base: payload.base, petal: payload.petal, flower: payload.flower, deco: payload.deco,
+        name: payload.name, classroom: payload.classroom, wish: payload.showWish ? wish : '', showWish: payload.showWish, createdAt: new Date().toISOString() };
       ks.items.push(item);
       ks.total++;
       // ส่วนตัว: จำคำอธิษฐานของตัวเองไว้ในเครื่อง แม้จะไม่เปิดให้คนอื่นเห็น
@@ -289,6 +336,7 @@
         f.wish.value = '';
         f.number.value = '';
         preview();
+        if (isAdmin()) loadAdmin();
       }, reduced() ? 50 : 900);
       toast('ลอยกระทงแล้ว ขอให้สมหวังทุกประการ 🪷');
     } catch (x) { err.textContent = x.message; }
@@ -307,6 +355,7 @@
     if (!ks.items) await SC.prime(async (get) => { const data = get('krathongs'); ks.items = data.items; ks.total = data.total; });
     if (ks.items) renderRiver();
     try { await load(); renderRiver(); } catch (err) { if (!ks.items) { ks.items = []; renderRiver(); } toast('โหลดกระทงไม่สำเร็จ: ' + err.message, true); }
+    loadAdmin();
     clearInterval(ks.timer);
     // กระทงใหม่ของเพื่อน ๆ ไหลมาเรื่อย ๆ ระหว่างเปิดหน้านี้
     ks.timer = setInterval(async () => {
@@ -317,7 +366,10 @@
     }, 60000);
   });
   $('#lkForm').addEventListener('submit', launch);
-  $('#lkForm').number.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); preview(); });
+  $('#lkForm').number.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
+  $('#lkForm').name.addEventListener('input', preview);
+  $('#lkAdminQ').addEventListener('input', renderAdmin);
+  document.addEventListener('sc:auth', () => { if (!$('#page-krathong').hidden) { loadAdmin(); renderRiver(); } });
   $('#lkScene').addEventListener('click', closeBubble);
   $('#lkCta').addEventListener('click', (e) => { e.stopPropagation(); $('#lkMake').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth' }); });
   $('#lkRandom').addEventListener('click', randomDesign);
@@ -330,22 +382,26 @@
     if (!db.krathongs) {
       const wishes = ['ขอให้สอบผ่านทุกวิชา', 'ขอให้ครอบครัวมีสุขภาพแข็งแรง', 'ขอให้สภานักเรียนทำงานราบรื่น', 'ขอให้ติดมหาวิทยาลัยที่ใฝ่ฝัน', '', 'ขอให้เพื่อน ๆ มีความสุข', 'ขอให้ปีหน้าเกรดดีขึ้น', ''];
       db.krathongs = wishes.map((w, i) => ({ id: 'demo' + i, base: Object.keys(BASES)[i % 4], petal: PETALS[i % PETALS.length], flower: FLOWERS[i % FLOWERS.length],
-        deco: Object.keys(DECOS).filter((_, j) => (i + j) % 3 === 0).join(','), number: String(30101 + i * 37), wish: w || 'ความลับ', name: i % 2 ? 'ม.5/' + (i % 7 + 1) : '',
+        deco: Object.keys(DECOS).filter((_, j) => (i + j) % 3 === 0).join(','), number: String(30101 + i * 37), wish: w || 'ความลับ', name: ['มะลิ', 'ภูมิ', 'ฟ้าใส', 'ต้นกล้า', 'ใบเตย', 'ข้าวหอม', 'ดาว', 'ปลื้ม'][i], classroom: `ม.${(i % 6) + 1}/${(i % 4) + 1}`,
         showWish: !!w, status: 'active', createdAt: new Date(Date.now() - (8 - i) * 6e5).toISOString() }));
     }
     return db.krathongs;
   };
   ext.krathongs = (db) => {
     const rows = demoList(db).filter(k => k.status !== 'hidden');
-    return JSON.parse(JSON.stringify({ total: rows.length, items: rows.map(k => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
+    return JSON.parse(JSON.stringify({ total: rows.length, items: rows.map(({ number, ...k }) => ({ ...k, wish: k.showWish ? k.wish : '' })) }));
   };
+  ext.adminKrathongs = (db, b, sess) => { sess(true); return JSON.parse(JSON.stringify(demoList(db).map(k => ({ ...k, hidden: k.status === 'hidden' })))); };
+  ext.deleteKrathong = (db, b, sess) => { sess(true); db.krathongs = demoList(db).filter(k => k.id !== b.id); return true; };
   ext.floatKrathong = (db, b) => {
-    if (!/^\d{3,8}$/.test(String(b.number || ''))) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');
+    if (!/^\d{5}$/.test(String(b.number || ''))) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน 5 หลัก');
+    if (!String(b.name || '').trim()) throw new Error('กรุณากรอกชื่อ');
+    if (!/^ม\.[1-6]\/([1-9]|1[0-9]|20)$/.test(String(b.classroom || ''))) throw new Error('กรุณาเลือกชั้น เช่น ม.1/1');
     if (!String(b.wish || '').trim()) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
     if (rudeWord(b.wish) || rudeWord(b.name)) throw new Error('ข้อความมีคำไม่สุภาพ กรุณาแก้ไขก่อนลอยกระทงนะ');
     const id = SC.uid();
-    demoList(db).push({ id, base: BASES[b.base] ? b.base : 'leaf', petal: b.petal, flower: b.flower, deco: b.deco, number: String(b.number || '').slice(0, 12),
-      wish: String(b.wish).slice(0, 300), name: String(b.name || '').slice(0, 40), showWish: b.showWish === true, status: 'active', createdAt: new Date().toISOString() });
+    demoList(db).push({ id, base: BASES[b.base] ? b.base : 'leaf', petal: b.petal, flower: b.flower, deco: b.deco, number: String(b.number),
+      wish: String(b.wish).slice(0, 300), name: String(b.name).trim().slice(0, 40), classroom: b.classroom, showWish: b.showWish === true, status: 'active', createdAt: new Date().toISOString() });
     return { id };
   };
   ext.hideKrathong = (db, b, sess) => { sess('news'); const k = demoList(db).find(x => x.id === b.id); if (k) k.status = 'hidden'; return true; };
