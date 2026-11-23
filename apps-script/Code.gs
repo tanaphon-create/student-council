@@ -1418,6 +1418,20 @@ function deleteNews_(b) {
 }
 
 /* ---------- ลอยกระทงออนไลน์ ---------- */
+// กรองคำไม่สุภาพ (ชุดเดียวกับหน้าเว็บ krathong.js) — ตัดช่องว่าง/สัญลักษณ์และตัวอักษรซ้ำก่อนเทียบ
+const RUDE_TONED_ = [/ควย/, /เหี้ย/, /เหี่ย(?!ว)/, /เชี่ย/, /สัส/, /สัด(?!ส)/, /เย็ด/, /เยด/, /(?<!เ)หี(?![บดย่])/, /มึง/, /แม่ง/, /ห่า(?!น)/, /ระยำ/, /[ชฉ]ิบหาย/,
+  /จัญไร/, /ดอกทอง/, /ส้นตีน/, /เสือก/, /กะหรี่/, /เงี่ยน/, /จิ๋ม/, /ตอแหล/, /สถุน/, /ร่าน/, /(ไอ้|อี)(สัตว์|ควาย|เวร)/, /อีดอก/, /ชาติหมา/,
+  /ปัญญาอ่อน/, /เชร็?ด/, /เหีย(?![วน])/];
+const RUDE_LATIN_ = [/fu+c?k/, /fck/, /sh[i1]t/, /b[i1]tch/, /btch/, /dick(?!ens)/, /pussy/, /asshole/, /bastard/, /cunt/, /motherf/, /wtf/, /stfu/, /slut/, /whore/, /nigg/, /porn/];
+function rudeWord_(text) {
+  const raw = String(text || '').toLowerCase();
+  const thai = raw.replace(/[^\u0E00-\u0E7F]/g, '').replace(/(.)\1+/g, '$1');
+  const leet = { 0: 'o', '@': 'a', 4: 'a', 1: 'i', '!': 'i', 3: 'e', 5: 's', $: 's', 7: 't' };
+  const latin = raw.replace(/[0@41!35$7]/g, c => leet[c]).replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1');
+  const spaced = raw.replace(/[^\u0E00-\u0E7Fa-z\s]/g, ' ');
+  return RUDE_TONED_.some(re => re.test(thai)) || RUDE_LATIN_.some(re => re.test(latin)) || /(^|\s)กู(\s|$|จะ|ขอ|อยาก|ว่า)/.test(spaced);
+}
+
 const hexColor_ = (v, d) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : d;
 
 // กระทงทุกใบ (แสดงบนแม่น้ำตามจำนวนจริง) — คำอธิษฐานส่งเฉพาะใบที่เจ้าของเลือกให้แสดง ไม่ส่งรหัสเครื่องออกไป
@@ -1444,10 +1458,11 @@ function floatKrathong_(b) {
   if (!/^\d{3,8}$/.test(sid)) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');
   const wish = clean_(b.wish, 300);
   if (!wish) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
+  if (rudeWord_(b.wish) || rudeWord_(b.name)) throw new Error('ข้อความมีคำไม่สุภาพ กรุณาแก้ไขก่อนลอยกระทงนะ');
   const row = {
     id: Utilities.getUuid(), base: KRATHONG_BASES.indexOf(b.base) >= 0 ? b.base : 'leaf',
     petal: hexColor_(b.petal, '#f06292'), flower: hexColor_(b.flower, '#ffd54f'),
-    deco: String(b.deco || '').split(',').filter(x => /^[a-z]{2,12}$/.test(x)).slice(0, 5).join(','),
+    deco: String(b.deco || '').split(',').filter(x => /^[a-z]{2,12}$/.test(x)).slice(0, 6).join(','),
     number: sid, wish, name: clean_(b.name, 40),
     showWish: b.showWish === true ? 'true' : 'false', deviceId: dev, status: 'active', createdAt: new Date().toISOString(),
   };

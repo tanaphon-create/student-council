@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
   <!-- INTRO: แสดงครั้งแรกที่เปิดเว็บ และเมื่อกดหน้าแรก -->
@@ -299,16 +299,17 @@
         <div class="card lk-builder">
           <div class="lk-stage"><div class="lk-preview" id="lkPreview"></div><p>ตัวอย่างกระทงของคุณ</p></div>
           <form id="lkForm" autocomplete="off">
-            <h2>ตกแต่งกระทงของคุณ</h2>
+            <div class="lk-formhead"><h2>ตกแต่งกระทงของคุณ</h2><button type="button" class="btn btn-ghost btn-sm" id="lkRandom">🎲 สุ่มให้</button></div>
             <fieldset><legend>ฐานกระทง</legend><div class="lk-opts" id="lkBases"></div></fieldset>
             <fieldset><legend>สีกลีบ</legend><div class="lk-sws" id="lkPetals"></div></fieldset>
             <fieldset><legend>สีดอกไม้</legend><div class="lk-sws" id="lkFlowers"></div></fieldset>
-            <fieldset><legend>ของตกแต่ง <small>(เลือกได้หลายอย่าง)</small></legend><div class="lk-chips" id="lkDecos"></div></fieldset>
+            <fieldset><legend>ของตกแต่ง <small>(เลือกได้สูงสุด 6 อย่าง)</small></legend><div id="lkDecos"></div></fieldset>
             <div class="row2">
               <div class="field"><label for="lk1">เลขประจำตัวนักเรียน</label><input id="lk1" name="number" inputmode="numeric" pattern="[0-9]{3,8}" maxlength="8" required placeholder="เช่น 12345"></div>
               <div class="field"><label for="lk2">ชื่อ <small>(ไม่บังคับ)</small></label><input id="lk2" name="name" maxlength="40" placeholder="ชื่อเล่น หรือ ห้อง"></div>
             </div>
-            <div class="field"><label for="lk3">คำอธิษฐาน</label><textarea id="lk3" name="wish" rows="3" maxlength="300" required placeholder="ขอให้…"></textarea></div>
+            <div class="field"><label for="lk3">คำอธิษฐาน</label><textarea id="lk3" name="wish" rows="3" maxlength="300" required placeholder="ขอให้…"></textarea>
+              <p class="lk-rude" id="lkRude" role="alert" hidden></p></div>
             <label class="chk"><input type="checkbox" name="showWish" checked> ให้เพื่อน ๆ เห็นคำอธิษฐานนี้ (ไม่ติ๊ก = เก็บเป็นความลับ)</label>
             <input class="hp" name="website" tabindex="-1" aria-hidden="true">
             <p class="err"></p>
@@ -385,6 +386,6 @@
   <script src="gallery.js?v=2"></script>
   <script src="certs.js?v=2"></script>
   <script src="news.js?v=1"></script>
-  <script src="krathong.js?v=4"></script>
+  <script src="krathong.js?v=5"></script>
 </body>
 </html>

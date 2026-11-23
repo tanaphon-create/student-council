@@ -13,13 +13,18 @@
   };
   const PETALS = ['#f06292', '#ba68c8', '#ffffff', '#ffb74d', '#e53935', '#4fc3f7', '#81c784', '#fff176'];
   const FLOWERS = ['#ffd54f', '#ff8a65', '#ffffff', '#f48fb1', '#ce93d8', '#e57373'];
+  // ของตกแต่ง แบ่งหมวดในหน้าเลือก — เลือกได้สูงสุด MAX_DECO อย่าง
   const DECOS = {
-    jasmine: 'พวงมาลัยมะลิ',
-    orchid: 'กล้วยไม้',
-    sparkle: 'ประกายทอง',
-    coin: 'เหรียญ',
-    leaves: 'ใบไม้เพิ่ม',
+    jasmine: '🤍 มาลัยมะลิ', orchid: '💜 กล้วยไม้', leaves: '🌿 ใบไม้เพิ่ม', lotusbud: '🪷 บัวตูม',
+    bunny: '🐰 กระต่ายน้อย', duck: '🐥 เป็ดน้อย', fish: '🐟 ปลาน้อย', butterfly: '🦋 ผีเสื้อ', hearts: '💗 หัวใจ', bow: '🎀 โบว์',
+    sparkle: '✨ ประกายทอง', fireflies: '🌟 หิ่งห้อย', candles: '🕯️ เทียนเพิ่ม', star: '⭐ คทาดาว', rainbow: '🌈 สายรุ้ง', beads: '🔮 ลูกปัดสี', coin: '🪙 เหรียญ',
   };
+  const DECO_GROUPS = [
+    ['ดอกไม้และใบไม้', ['jasmine', 'orchid', 'leaves', 'lotusbud']],
+    ['น่ารักกุ๊กกิ๊ก', ['bunny', 'duck', 'fish', 'butterfly', 'hearts', 'bow']],
+    ['แสงและประกาย', ['sparkle', 'fireflies', 'candles', 'star', 'rainbow', 'beads', 'coin']],
+  ];
+  const MAX_DECO = 6;
   const ks = { items: null, total: 0, mine: new Set(), built: false, timer: null,
     design: { base: 'leaf', petal: PETALS[0], flower: FLOWERS[0], deco: ['jasmine'] } };
   const store = {
@@ -50,6 +55,11 @@
       out += `<path d="M${(x - nx).toFixed(1)},${(y - ny).toFixed(1)} Q${(tx - nx * 0.4).toFixed(1)},${(ty - ny).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)} Q${(tx + nx * 0.4).toFixed(1)},${(ty + ny).toFixed(1)} ${(x + nx).toFixed(1)},${(y + ny).toFixed(1)}Z" fill="${fill}" stroke="${stroke}" stroke-width=".8"/>`;
     }
     return out;
+  }
+  const BEAD_COLORS = ['#ef5350', '#ffca28', '#66bb6a', '#42a5f5', '#ab47bc', '#ff8a65'];
+  function starPath(cx, cy, r, fill, stroke) {
+    const pts = Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; return `${(cx + Math.cos(a) * rr).toFixed(1)},${(cy + Math.sin(a) * rr).toFixed(1)}`; });
+    return `<polygon points="${pts.join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width=".7" class="lk-sparkle"/>`;
   }
   function shade(hex, k) {
     const n = parseInt(hex.slice(1), 16);
@@ -89,7 +99,22 @@
       deco.has('jasmine') ? Array.from({ length: 16 }, (_, i) => { const a = i / 16 * Math.PI * 2; return `<circle cx="${(60 + Math.cos(a) * 31).toFixed(1)}" cy="${(68 + Math.sin(a) * 8).toFixed(1)}" r="2.4" fill="#fffde7" stroke="#e0e0c8" stroke-width=".5"/>`; }).join('') : '',
       deco.has('orchid') ? [[34, 56], [86, 56], [60, 66]].map(([x, y]) => `<g transform="translate(${x} ${y})"><circle r="4" fill="#ab47bc"/><circle r="4" cx="5" fill="#ce93d8"/><circle r="4" cx="-5" fill="#ce93d8"/><circle r="2" fill="#fff59d"/></g>`).join('') : '',
       deco.has('coin') ? `<circle cx="78" cy="64" r="4.5" fill="#ffca28" stroke="#ff8f00" stroke-width="1"/><circle cx="42" cy="65" r="4" fill="#ffd54f" stroke="#ff8f00" stroke-width="1"/>` : '',
+      deco.has('beads') ? Array.from({ length: 14 }, (_, i) => { const a = i / 14 * Math.PI * 2 + 0.2; return `<circle cx="${(60 + Math.cos(a) * 34).toFixed(1)}" cy="${(71 + Math.sin(a) * 9).toFixed(1)}" r="2.1" fill="${BEAD_COLORS[i % BEAD_COLORS.length]}" stroke="#fff" stroke-width=".5"/>`; }).join('') : '',
+      deco.has('candles') ? [42, 80].map(x => `<rect x="${x - 1.8}" y="40" width="3.6" height="11" rx="1" fill="#fff3e0" stroke="#e0d0b0" stroke-width=".4"/><path d="M${x} 35 Q${x + 2.4} 39 ${x} 41.5 Q${x - 2.4} 39 ${x} 35Z" fill="#ffb300" class="lk-flame"/>`).join('') : '',
+      deco.has('lotusbud') ? `<path d="M76 58 Q78 44 80 34" stroke="#558b2f" stroke-width="1.4" fill="none"/><path d="M80 24 Q86 31 80 37 Q74 31 80 24Z" fill="#f48fb1" stroke="#ec407a" stroke-width=".6"/><path d="M80 27 Q83 32 80 37 Q77 32 80 27Z" fill="#f8bbd0"/>` : '',
+      deco.has('star') ? `<path d="M42 58 L38 32" stroke="#bf8f00" stroke-width="1.4"/>${starPath(38, 27, 6, '#ffd54f', '#ff8f00')}` : '',
     ].join('');
+    // ของน่ารักที่วางหน้ากระทงและบนน้ำ (วาดทับเทียนและดอกไม้)
+    const front = [
+      deco.has('bow') ? `<g transform="translate(60 80)"><path d="M0 0 L-12 -6 Q-15 0 -12 6Z" fill="#ec407a"/><path d="M0 0 L12 -6 Q15 0 12 6Z" fill="#ec407a"/><path d="M-1.5 1.5 L-6 10 L-2.5 9Z M1.5 1.5 L6 10 L2.5 9Z" fill="#d81b60"/><circle r="3" fill="#f06292"/></g>` : '',
+      deco.has('bunny') ? `<g transform="translate(30 56)"><ellipse cx="-3" cy="-9" rx="2.3" ry="6" fill="#fff" stroke="#e0e0e0" stroke-width=".5"/><ellipse cx="3" cy="-9" rx="2.3" ry="6" fill="#fff" stroke="#e0e0e0" stroke-width=".5"/><ellipse cx="-3" cy="-9" rx="1" ry="4" fill="#f8bbd0"/><ellipse cx="3" cy="-9" rx="1" ry="4" fill="#f8bbd0"/><circle r="6" fill="#fff" stroke="#e0e0e0" stroke-width=".5"/><circle cx="-2.2" cy="-.6" r=".9" fill="#333"/><circle cx="2.2" cy="-.6" r=".9" fill="#333"/><ellipse cy="1.5" rx=".9" ry=".6" fill="#f48fb1"/><circle cx="-3.9" cy="1.8" r="1.2" fill="#f8bbd0"/><circle cx="3.9" cy="1.8" r="1.2" fill="#f8bbd0"/></g>` : '',
+      deco.has('duck') ? `<g transform="translate(108 80)" class="lk-paddle"><ellipse rx="8" ry="5" fill="#ffd54f"/><path d="M-8 -1 l-3 -4 l1 5Z" fill="#ffca28"/><circle cx="5" cy="-6" r="4.2" fill="#ffd54f"/><path d="M8.8 -6.6 l4.2 1 l-4.2 1.6Z" fill="#ff8f00"/><circle cx="6.2" cy="-7.2" r=".85" fill="#333"/><circle cx="4" cy="-4.6" r="1" fill="#ffab91"/></g>` : '',
+      deco.has('fish') ? `<g transform="translate(10 88)" class="lk-paddle"><path d="M-5 0 l-6 -4.5 v9Z" fill="#ff7043"/><ellipse rx="7" ry="4" fill="#ff8a65"/><circle cx="3.5" cy="-1" r=".9" fill="#333"/><path d="M-1 -3.6 q2 -3 4 0" fill="#ffab91"/></g>` : '',
+      deco.has('butterfly') ? `<g transform="translate(20 24)"><g class="lk-flutter"><ellipse cx="-4.5" cy="-2" rx="5" ry="4" fill="#4fc3f7"/><ellipse cx="4.5" cy="-2" rx="5" ry="4" fill="#4fc3f7"/><ellipse cx="-3.5" cy="3" rx="3.5" ry="3" fill="#b3e5fc"/><ellipse cx="3.5" cy="3" rx="3.5" ry="3" fill="#b3e5fc"/></g><rect x="-.8" y="-5" width="1.6" height="10" rx=".8" fill="#37474f"/></g>` : '',
+      deco.has('hearts') ? [[14, 44, 0.9], [100, 44, 0.7], [108, 58, 0.55]].map(([x, y, s], i) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-5 -2 C-5 -6 0 -7 0 -3 C0 -7 5 -6 5 -2 C5 2 0 5 0 7 C0 5 -5 2 -5 -2Z" fill="${['#ff6fa5', '#ff8fb8', '#f06292'][i]}" class="lk-floaty"/></g>`).join('') : '',
+      deco.has('fireflies') ? [[8, 30], [26, 8], [96, 10], [114, 28], [4, 60], [116, 46]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="1.7" fill="#fff59d" class="lk-ff" style="animation-delay:-${i * 0.7}s"/>`).join('') : '',
+    ].join('');
+    const behind = deco.has('rainbow') ? ['#ef5350', '#ffca28', '#66bb6a', '#42a5f5'].map((c, i) => `<path d="M${16 + i * 4} 66 A${44 - i * 4} ${40 - i * 4} 0 0 1 ${104 - i * 4} 66" fill="none" stroke="${c}" stroke-width="3" opacity=".75"/>`).join('') : '';
     const cluster = [[60, 50, 7], [50, 54, 5.5], [70, 54, 5.5], [55, 46, 4.5], [66, 46, 4.5]]
       .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${flower}"/><circle cx="${x - r * 0.3}" cy="${y - r * 0.3}" r="${r * 0.45}" fill="${shade(flower, 1.15)}" opacity=".8"/>`).join('');
     const sparkle = deco.has('sparkle') ? [[30, 40], [92, 44], [80, 30], [40, 28]].map(([x, y]) => `<path d="M${x} ${y - 4} L${x + 1} ${y - 1} L${x + 4} ${y} L${x + 1} ${y + 1} L${x} ${y + 4} L${x - 1} ${y + 1} L${x - 4} ${y} L${x - 1} ${y - 1}Z" fill="#ffe082" class="lk-sparkle"/>`).join('') : '';
@@ -100,13 +125,13 @@
     return `<svg viewBox="0 0 ${number ? 140 : 120} 100" class="lk-svg" aria-hidden="true">
       <defs><radialGradient id="${uid}g"><stop offset="0" stop-color="#ffcc66" stop-opacity=".9"/><stop offset="1" stop-color="#ff9800" stop-opacity="0"/></radialGradient></defs>
       <ellipse cx="60" cy="82" rx="46" ry="7" fill="#000" opacity=".25"/>
-      ${body}${extras}${cluster}
+      ${behind}${body}${extras}${cluster}
       <line x1="52" y1="46" x2="49" y2="22" stroke="#8d6e63" stroke-width="1.2"/><line x1="56" y1="46" x2="55" y2="20" stroke="#8d6e63" stroke-width="1.2"/><line x1="68" y1="46" x2="71" y2="22" stroke="#8d6e63" stroke-width="1.2"/>
       <circle cx="49" cy="22" r="1.4" fill="#ff7043" class="lk-ember"/><circle cx="55" cy="20" r="1.4" fill="#ff7043" class="lk-ember"/><circle cx="71" cy="22" r="1.4" fill="#ff7043" class="lk-ember"/>
       <rect x="60" y="30" width="5" height="17" rx="1.5" fill="#fffde7" stroke="#e0d9b5" stroke-width=".5"/>
       <circle cx="62.5" cy="24" r="13" fill="url(#${uid}g)" class="lk-glow"/>
       <path d="M62.5 18 Q66 24 62.5 29 Q59 24 62.5 18Z" fill="#ffb300" class="lk-flame"/><path d="M62.5 21 Q64.3 25 62.5 28 Q60.7 25 62.5 21Z" fill="#fff8e1" class="lk-flame"/>
-      ${sparkle}${flag}${opt.label ? `<text x="60" y="97" font-size="8" text-anchor="middle" fill="#ffe082" font-family="Prompt, sans-serif">${esc(opt.label)}</text>` : ''}
+      ${sparkle}${front}${flag}${opt.label ? `<text x="60" y="97" font-size="8" text-anchor="middle" fill="#ffe082" font-family="Prompt, sans-serif">${esc(opt.label)}</text>` : ''}
     </svg>`;
   }
 
@@ -185,12 +210,50 @@
     $('#lkBases').innerHTML = Object.entries(BASES).map(([k, v]) => `<button type="button" class="lk-opt ${d.base === k ? 'on' : ''}" data-base="${k}" aria-pressed="${d.base === k}"><span>${v.icon}</span>${v.label}</button>`).join('');
     $('#lkPetals').innerHTML = PETALS.map(c => `<button type="button" class="lk-sw ${d.petal === c ? 'on' : ''}" data-petal="${c}" style="--c:${c}" aria-label="สีกลีบ ${c}" aria-pressed="${d.petal === c}"></button>`).join('');
     $('#lkFlowers').innerHTML = FLOWERS.map(c => `<button type="button" class="lk-sw ${d.flower === c ? 'on' : ''}" data-flower="${c}" style="--c:${c}" aria-label="สีดอกไม้ ${c}" aria-pressed="${d.flower === c}"></button>`).join('');
-    $('#lkDecos').innerHTML = Object.entries(DECOS).map(([k, v]) => `<button type="button" class="lk-chip ${d.deco.includes(k) ? 'on' : ''}" data-deco="${k}" aria-pressed="${d.deco.includes(k)}">${v}</button>`).join('');
+    $('#lkDecos').innerHTML = DECO_GROUPS.map(([title, keys]) => `<div class="lk-dgroup"><small>${title}</small><div class="lk-chips">${keys.map(k =>
+      `<button type="button" class="lk-chip ${d.deco.includes(k) ? 'on' : ''}" data-deco="${k}" aria-pressed="${d.deco.includes(k)}">${DECOS[k]}</button>`).join('')}</div></div>`).join('')
+      + `<p class="hint lk-dcount">เลือกแล้ว ${d.deco.length}/${MAX_DECO} อย่าง</p>`;
     preview();
     $$('[data-base]').forEach(b => (b.onclick = () => { d.base = b.dataset.base; renderBuilder(); }));
     $$('[data-petal]').forEach(b => (b.onclick = () => { d.petal = b.dataset.petal; renderBuilder(); }));
     $$('[data-flower]').forEach(b => (b.onclick = () => { d.flower = b.dataset.flower; renderBuilder(); }));
-    $$('[data-deco]').forEach(b => (b.onclick = () => { const i = d.deco.indexOf(b.dataset.deco); if (i < 0) d.deco.push(b.dataset.deco); else d.deco.splice(i, 1); renderBuilder(); }));
+    $$('[data-deco]').forEach(b => (b.onclick = () => {
+      const i = d.deco.indexOf(b.dataset.deco);
+      if (i >= 0) d.deco.splice(i, 1);
+      else if (d.deco.length >= MAX_DECO) return toast(`เลือกของตกแต่งได้สูงสุด ${MAX_DECO} อย่าง เอาอันเดิมออกก่อนนะ`, true);
+      else d.deco.push(b.dataset.deco);
+      renderBuilder();
+    }));
+  }
+  // สุ่มแบบ สี และของตกแต่ง 3–4 อย่าง
+  function randomDesign() {
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const keys = Object.keys(DECOS).sort(() => Math.random() - 0.5);
+    ks.design = { base: pick(Object.keys(BASES)), petal: pick(PETALS), flower: pick(FLOWERS), deco: keys.slice(0, 3 + Math.floor(Math.random() * 2)) };
+    renderBuilder();
+  }
+
+  /* ================= กรองคำไม่สุภาพ ================= */
+  // ตัดช่องว่าง/สัญลักษณ์ที่ใช้เลี่ยงคำ และตัวอักษรซ้ำ แล้วเทียบกับรายการคำ (บางคำยกเว้นคำปกติที่หน้าตาคล้ายกัน)
+  const RUDE_TONED = [/ควย/, /เหี้ย/, /เหี่ย(?!ว)/, /เชี่ย/, /สัส/, /สัด(?!ส)/, /เย็ด/, /เยด/, /(?<!เ)หี(?![บดย่])/, /มึง/, /แม่ง/, /ห่า(?!น)/, /ระยำ/, /[ชฉ]ิบหาย/,
+    /จัญไร/, /ดอกทอง/, /ส้นตีน/, /เสือก/, /กะหรี่/, /เงี่ยน/, /จิ๋ม/, /ตอแหล/, /สถุน/, /ร่าน/, /(ไอ้|อี)(สัตว์|ควาย|เวร)/, /อีดอก/, /ชาติหมา/,
+    /ปัญญาอ่อน/, /เชร็?ด/, /เหีย(?![วน])/];
+  const RUDE_LATIN = [/fu+c?k/, /fck/, /sh[i1]t/, /b[i1]tch/, /btch/, /dick(?!ens)/, /pussy/, /asshole/, /bastard/, /cunt/, /motherf/, /wtf/, /stfu/, /slut/, /whore/, /nigg/, /porn/];
+  function rudeWord(text) {
+    const raw = String(text || '').toLowerCase();
+    const thai = raw.replace(/[^฀-๿]/g, '').replace(/(.)\1+/g, '$1');
+    const latin = raw.replace(/[0@4]/g, (c) => ({ 0: 'o', '@': 'a', 4: 'a' })[c]).replace(/[1!]/g, 'i').replace(/3/g, 'e').replace(/[5$]/g, 's').replace(/7/g, 't')
+      .replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1');
+    const spaced = raw.replace(/[^฀-๿a-z\s]/g, ' ');
+    return RUDE_TONED.some(re => re.test(thai)) || RUDE_LATIN.some(re => re.test(latin)) || /(^|\s)กู(\s|$|จะ|ขอ|อยาก|ว่า)/.test(spaced);
+  }
+  function checkRude() {
+    const f = $('#lkForm');
+    const bad = rudeWord(f.wish.value) ? 'คำอธิษฐาน' : rudeWord(f.name.value) ? 'ชื่อ' : '';
+    $('#lkRude').hidden = !bad;
+    $('#lkRude').textContent = bad ? `${bad}มีคำไม่สุภาพ กรุณาแก้ไขก่อนลอยกระทงนะ 🙏` : '';
+    $('button[type=submit]', f).disabled = !!bad;
+    return bad;
   }
   const preview = () => { $('#lkPreview').innerHTML = krathongSvg({ ...ks.design, number: $('#lkForm').number.value }); };
 
@@ -201,6 +264,7 @@
     const wish = f.wish.value.trim(), sid = f.number.value.trim();
     if (!/^\d{3,8}$/.test(sid)) { err.textContent = 'กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)'; f.number.focus(); return; }
     if (!wish) { err.textContent = 'อย่าลืมเขียนคำอธิษฐานนะ'; f.wish.focus(); return; }
+    if (checkRude()) return;
     btn.disabled = true;
     const d = ks.design;
     const payload = { action: 'floatKrathong', base: d.base, petal: d.petal, flower: d.flower, deco: d.deco.join(','), number: f.number.value.trim(),
@@ -256,6 +320,9 @@
   $('#lkForm').number.addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8); preview(); });
   $('#lkScene').addEventListener('click', closeBubble);
   $('#lkCta').addEventListener('click', (e) => { e.stopPropagation(); $('#lkMake').scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth' }); });
+  $('#lkRandom').addEventListener('click', randomDesign);
+  $('#lkForm').wish.addEventListener('input', checkRude);
+  $('#lkForm').name.addEventListener('input', checkRude);
 
   /* ================= โหมดทดลอง ================= */
   const ext = SC.demoExt;
@@ -275,6 +342,7 @@
   ext.floatKrathong = (db, b) => {
     if (!/^\d{3,8}$/.test(String(b.number || ''))) throw new Error('กรุณากรอกเลขประจำตัวนักเรียน (ตัวเลข 3–8 หลัก)');
     if (!String(b.wish || '').trim()) throw new Error('อย่าลืมเขียนคำอธิษฐานนะ');
+    if (rudeWord(b.wish) || rudeWord(b.name)) throw new Error('ข้อความมีคำไม่สุภาพ กรุณาแก้ไขก่อนลอยกระทงนะ');
     const id = SC.uid();
     demoList(db).push({ id, base: BASES[b.base] ? b.base : 'leaf', petal: b.petal, flower: b.flower, deco: b.deco, number: String(b.number || '').slice(0, 12),
       wish: String(b.wish).slice(0, 300), name: String(b.name || '').slice(0, 40), showWish: b.showWish === true, status: 'active', createdAt: new Date().toISOString() });

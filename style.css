@@ -1101,3 +1101,19 @@ html.lb-on, html.lb-on body { overflow: hidden; }
 }
 .lk-river.is-crowded .lk-bob, .lk-river.is-crowded .lk-refl, .lk-river.is-crowded .lk-glow, .lk-river.is-crowded .lk-flame { animation: none; }
 .lk-empty-river { position: absolute; left: 0; right: 0; top: 38%; margin: 0; text-align: center; color: #cfe8ef; font-size: 17px; opacity: .85; padding: 0 16px; }
+.lk-formhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.lk-formhead h2 { margin: 0 !important; }
+.lk-dgroup { margin-bottom: 10px; }
+.lk-dgroup > small { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.lk-dcount { margin: 2px 0 0; }
+.lk-rude { margin: 6px 0 0; padding: 8px 12px; border-radius: 10px; background: #fde7e7; color: #b42318; font-size: 14px; font-weight: 500; }
+.lk-floaty { animation: lkFloaty 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes lkFloaty { 50% { transform: translateY(-3px) scale(1.08); } }
+.lk-flutter { animation: lkFlutter .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes lkFlutter { to { transform: scaleX(.45); } }
+.lk-ff { animation: lkFirefly 3s ease-in-out infinite; filter: drop-shadow(0 0 2px #fff59d); }
+@keyframes lkFirefly { 0%, 100% { opacity: .2; transform: translate(0, 0); } 50% { opacity: 1; transform: translate(2px, -3px); } }
+.lk-paddle { animation: lkPaddle 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes lkPaddle { 50% { transform: rotate(-6deg) translateY(-1px); } }
+.lk-river.is-crowded .lk-floaty, .lk-river.is-crowded .lk-flutter, .lk-river.is-crowded .lk-ff, .lk-river.is-crowded .lk-paddle { animation: none; }
+@media (prefers-reduced-motion: reduce) { .lk-floaty, .lk-flutter, .lk-ff, .lk-paddle { animation: none; } }
