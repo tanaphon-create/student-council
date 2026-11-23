@@ -1178,3 +1178,13 @@ html.lb-on, html.lb-on body { overflow: hidden; }
   .lk-promo { grid-template-columns: 80px minmax(0, 1fr); bottom: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .lk-banner-k, .lk-promo-k, .lk-promo { animation: none; } }
+.lk-music { position: absolute; right: 16px; top: 16px; z-index: 40; border: 1px solid rgba(255, 215, 106, .55); background: rgba(7, 24, 34, .55); color: #ffe7a3;
+  font: 600 15px 'Prompt', sans-serif; padding: 9px 16px; border-radius: 999px; cursor: pointer; backdrop-filter: blur(6px); white-space: nowrap; }
+.lk-music:hover { background: rgba(255, 215, 106, .2); }
+.lk-music.on { background: rgba(255, 215, 106, .9); color: #3b2500; animation: lkPulse 2.4s ease-in-out infinite; }
+@keyframes lkPulse { 50% { box-shadow: 0 0 0 8px rgba(255, 215, 106, .18); } }
+@media (prefers-reduced-motion: reduce) { .lk-music.on { animation: none; } }
+@media (max-width: 640px) {
+  .lk-music { top: 12px; right: 12px; font-size: 14px; padding: 7px 13px; }
+  .lk-title { top: 58px; }
+}

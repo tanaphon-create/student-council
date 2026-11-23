@@ -447,6 +447,75 @@
   $('#lkForm').wish.addEventListener('input', checkRude);
   $('#lkForm').name.addEventListener('input', checkRude);
 
+  /* ================= เพลงประกอบ ================= */
+  // เพลงบรรเลงแนวไทยที่แต่งขึ้นใหม่ (ไม่ใช่เพลงที่มีลิขสิทธิ์) วนซ้ำต่อเนื่องด้วย Web Audio
+  // เบราว์เซอร์ไม่ให้เล่นเสียงเอง จึงเริ่มเมื่อผู้ใช้กดปุ่ม และหยุดเมื่อออกจากหน้านี้หรือสลับแท็บ
+  const MUSIC_URL = 'assets/krathong-loop.mp3';
+  const LOOP_SEC = 45.714; // 16 ห้องที่ 84 BPM — ตัดช่วงเงียบท้ายไฟล์ MP3 ออกให้วนต่อพอดี
+  const mu = { ctx: null, buf: null, src: null, gain: null, on: false, loading: false };
+  function musicButton() {
+    const b = $('#lkMusic');
+    b.textContent = mu.loading ? '⏳ กำลังโหลดเพลง…' : mu.on ? '🔊 ปิดเพลง' : '🎵 เปิดเพลง';
+    b.setAttribute('aria-pressed', String(mu.on));
+    b.classList.toggle('on', mu.on);
+  }
+  async function musicOn() {
+    if (!mu.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return toast('เบราว์เซอร์นี้เล่นเพลงไม่ได้', true);
+      mu.ctx = new AC();
+      mu.gain = mu.ctx.createGain();
+      mu.gain.connect(mu.ctx.destination);
+    }
+    if (mu.ctx.state === 'suspended') await mu.ctx.resume();
+    if (!mu.buf) {
+      mu.loading = true; musicButton();
+      try { mu.buf = await mu.ctx.decodeAudioData(await (await fetch(MUSIC_URL)).arrayBuffer()); }
+      catch (err) { mu.loading = false; musicButton(); return toast('โหลดเพลงไม่สำเร็จ', true); }
+      mu.loading = false;
+    }
+    if (mu.src) return;
+    mu.src = mu.ctx.createBufferSource();
+    mu.src.buffer = mu.buf;
+    mu.src.loop = true;
+    mu.src.loopStart = 0;
+    mu.src.loopEnd = Math.min(LOOP_SEC, mu.buf.duration);
+    mu.src.connect(mu.gain);
+    const now = mu.ctx.currentTime;
+    mu.gain.gain.cancelScheduledValues(now);
+    mu.gain.gain.setValueAtTime(0, now);
+    mu.gain.gain.linearRampToValueAtTime(0.9, now + 1.5); // ค่อย ๆ ดังขึ้น
+    mu.src.start();
+    mu.on = true;
+    store.set('sc_lk_music', '1');
+    musicButton();
+  }
+  function musicOff(remember = true) {
+    if (mu.src) {
+      const src = mu.src, now = mu.ctx.currentTime;
+      mu.gain.gain.cancelScheduledValues(now);
+      mu.gain.gain.setValueAtTime(mu.gain.gain.value, now);
+      mu.gain.gain.linearRampToValueAtTime(0, now + 0.4);
+      src.stop(now + 0.45);
+      mu.src = null;
+    }
+    mu.on = false;
+    if (remember) store.set('sc_lk_music', '0');
+    musicButton();
+  }
+  $('#lkMusic').addEventListener('click', (e) => { e.stopPropagation(); if (mu.loading) return; if (mu.on) musicOff(); else musicOn(); });
+  // ออกจากหน้าลอยกระทง → หยุดเพลง (จำไว้ว่าเคยเปิด กลับมาแล้วเล่นต่อได้ถ้าเบราว์เซอร์อนุญาต)
+  window.addEventListener('hashchange', () => {
+    const here = location.hash.startsWith('#krathong');
+    if (!here && mu.on) { musicOff(false); mu.resume = true; }
+    else if (here && mu.resume && mu.ctx) { mu.resume = false; musicOn(); }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!mu.ctx) return;
+    if (document.hidden) mu.ctx.suspend(); else if (mu.on) mu.ctx.resume();
+  });
+  musicButton();
+
   /* ================= โหมดทดลอง ================= */
   const ext = SC.demoExt;
   const demoList = (db) => {
