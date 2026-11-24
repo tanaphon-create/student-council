@@ -111,6 +111,7 @@
 
   function render() {
     if (ds.view === 'roster') return renderRoster();
+    if (ds.view === 'totals') return renderTotals();
     if (ds.view) {
       const d = dutyById(ds.view);
       if (d) return renderDuty(d);
@@ -377,6 +378,139 @@
       a.download = `เช็คชื่อ-${d.title}-${today()}.csv`;
       a.click(); URL.revokeObjectURL(a.href);
     };
+  }
+
+  /* ================= ยอดปฏิบัติงานรวมรายบุคคล ================= */
+  // ชั่วโมงต่อครั้งจากเวลาเริ่ม–สิ้นสุดของงาน (ไม่ระบุเวลา = ไม่นับชั่วโมง)
+  const hoursOf = (d) => {
+    if (!d.timeStart || !d.timeEnd) return 0;
+    const mins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const h = (mins(d.timeEnd) - mins(d.timeStart)) / 60;
+    return h > 0 ? h : 0;
+  };
+  // ปีการศึกษาไทย เริ่มเดือนพฤษภาคม
+  const acadYear = (s) => { const [y, m] = s.split('-').map(Number); return (m >= 5 ? y : y - 1) + 543; };
+  const sessDate = (d, s) => s === 'ALL' ? d.startDate : s;
+  const fmtH = (h) => h ? (Math.round(h * 10) / 10).toLocaleString('th-TH') : '0';
+
+  function totals(year) {
+    const per = new Map();
+    const get = (id) => {
+      if (!per.has(id)) per.set(id, { present: 0, late: 0, leave: 0, absent: 0, hours: 0, byDuty: new Map() });
+      return per.get(id);
+    };
+    ds.duties.forEach(d => {
+      const h = hoursOf(d);
+      dueSessions(d).forEach(s => {
+        if (year && acadYear(sessDate(d, s)) !== year) return;
+        d.memberIds.forEach(id => {
+          const a = ds.idx.get(key(d.id, s, id));
+          if (!a || !STATUS[a.status]) return;
+          const p = get(id);
+          if (!p.byDuty.has(d.id)) p.byDuty.set(d.id, { present: 0, late: 0, leave: 0, absent: 0, hours: 0 });
+          const q = p.byDuty.get(d.id);
+          const hrs = a.status === 'present' || a.status === 'late' ? (s === 'ALL' ? h * scheduleDates(d).length : h) : 0;
+          p[a.status]++; q[a.status]++; p.hours += hrs; q.hours += hrs;
+        });
+      });
+    });
+    return per;
+  }
+
+  function renderTotals() {
+    const years = [...new Set(ds.duties.flatMap(d => dueSessions(d).map(s => acadYear(sessDate(d, s)))))].sort((a, b) => b - a);
+    if (ds.totYear === undefined) ds.totYear = years.includes(acadYear(today())) ? acadYear(today()) : 0;
+    if (ds.totYear && !years.includes(ds.totYear)) ds.totYear = 0;
+    ds.totSort = ds.totSort || 'done';
+    const per = totals(ds.totYear);
+    const zero = { present: 0, late: 0, leave: 0, absent: 0, hours: 0, byDuty: new Map() };
+    const rows = ds.members.filter(m => m.active || per.has(m.id)).map(m => {
+      const p = per.get(m.id) || zero;
+      return { m, p, done: p.present + p.late, rate: rateOf(p) };
+    });
+    const sorters = {
+      done: (a, b) => b.done - a.done || b.p.hours - a.p.hours || byRank(a.m, b.m),
+      hours: (a, b) => b.p.hours - a.p.hours || b.done - a.done || byRank(a.m, b.m),
+      rate: (a, b) => (b.rate ?? -1) - (a.rate ?? -1) || b.done - a.done || byRank(a.m, b.m),
+      rank: (a, b) => byRank(a.m, b.m),
+    };
+    rows.sort(sorters[ds.totSort]);
+    const sum = rows.reduce((o, r) => { ['present', 'late', 'leave', 'absent', 'hours'].forEach(k => (o[k] += r.p[k])); return o; }, { present: 0, late: 0, leave: 0, absent: 0, hours: 0 });
+    const allRate = rateOf(sum);
+    const medal = (i, r) => ds.totSort !== 'rank' && r.done && i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1;
+    $('#dutyView').innerHTML = `
+      <a href="#duty" class="back-link">← งานทั้งหมด</a>
+      <div class="stats">
+        <div class="stat stat-balance"><span>ปฏิบัติงานรวมทั้งหมด</span><strong>${(sum.present + sum.late).toLocaleString('th-TH')} ครั้ง</strong></div>
+        <div class="stat"><span>ชั่วโมงรวม (โดยประมาณ)</span><strong class="c-in">${fmtH(sum.hours)}</strong></div>
+        <div class="stat"><span>อัตรามาปฏิบัติงาน</span><strong>${allRate == null ? '—' : allRate + '%'}</strong></div>
+        <div class="stat"><span>สมาชิก</span><strong>${rows.length} คน</strong></div>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <h2 class="card-title">ยอดปฏิบัติงานของสมาชิก</h2>
+          <span class="spacer"></span>
+          <select id="totYear" aria-label="ปีการศึกษา"><option value="0">ทุกปีการศึกษา</option>${years.map(y => `<option value="${y}" ${y === ds.totYear ? 'selected' : ''}>ปีการศึกษา ${y}</option>`).join('')}</select>
+          <select id="totSort" aria-label="เรียงตาม">
+            <option value="done">เรียงตามจำนวนครั้ง</option><option value="hours">เรียงตามชั่วโมง</option>
+            <option value="rate">เรียงตามอัตรามา</option><option value="rank">เรียงตามตำแหน่ง</option>
+          </select>
+          <input type="search" id="totSearch" placeholder="ค้นหาชื่อ / เลขประจำตัว / ชั้น" aria-label="ค้นหาสมาชิก">
+          <button class="btn btn-ghost btn-sm" id="btnTotCsv">ดาวน์โหลด CSV</button>
+        </div>
+        <p class="hint">นับเฉพาะวันที่หัวหน้าเช็คชื่อแล้ว · “ปฏิบัติงาน” = มา + สาย · ชั่วโมงคิดจากเวลาเริ่ม–สิ้นสุดของงาน (งานที่ไม่ระบุเวลาไม่นับชั่วโมง) · กดที่ชื่อเพื่อดูรายละเอียดแต่ละงาน</p>
+        ${rows.length ? `<div class="table-wrap"><table class="ledger plain totals">
+          <thead><tr><th>#</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>ตำแหน่ง/ฝ่าย</th><th class="num">ปฏิบัติงาน (ครั้ง)</th><th class="num">ชั่วโมง</th><th class="num">มา</th><th class="num">สาย</th><th class="num">ลา</th><th class="num">ขาด</th><th class="num">อัตรามา</th></tr></thead>
+          <tbody id="totBody">${rows.map((r, i) => `
+            <tr data-q="${esc(memberQ(r.m))}" class="${r.m.active ? '' : 'void'}">
+              <td class="medal">${medal(i, r)}</td>
+              <td><button class="btn-link tot-name" data-mid="${esc(r.m.id)}">${esc(r.m.name)}</button>${r.m.active ? '' : ' <span class="badge">พ้นสภาพ</span>'}</td>
+              <td>${esc(r.m.classroom)}</td><td>${esc(r.m.position)}</td>
+              <td class="num"><b>${r.done}</b></td><td class="num">${fmtH(r.p.hours)}</td>
+              <td class="num c-in">${r.p.present}</td><td class="num">${r.p.late}</td><td class="num">${r.p.leave}</td><td class="num c-out">${r.p.absent}</td>
+              <td class="num"><span class="rate ${r.rate == null ? '' : r.rate >= 80 ? 'good' : r.rate >= 60 ? 'mid' : 'low'}">${r.rate == null ? '—' : r.rate + '%'}</span></td>
+            </tr>`).join('')}</tbody>
+        </table></div>` : '<p class="empty">ยังไม่มีรายชื่อสมาชิก</p>'}
+      </div>`;
+    $('#totSort').value = ds.totSort;
+    $('#totYear').onchange = (e) => { ds.totYear = Number(e.target.value); renderTotals(); };
+    $('#totSort').onchange = (e) => { ds.totSort = e.target.value; renderTotals(); };
+    $('#totSearch').oninput = (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      $$('#totBody tr').forEach(tr => (tr.hidden = q && !tr.dataset.q.includes(q)));
+    };
+    const body = $('#totBody');
+    if (body) body.onclick = (e) => { const b = e.target.closest('[data-mid]'); if (b) memberTotals(rows.find(r => r.m.id === b.dataset.mid)); };
+    $('#btnTotCsv').onclick = () => {
+      const head = ['ลำดับ', 'เลขประจำตัว', 'ชื่อ-สกุล', 'ชั้น', 'ตำแหน่ง', 'ปฏิบัติงาน(ครั้ง)', 'ชั่วโมง', 'มา', 'สาย', 'ลา', 'ขาด', 'อัตรามา(%)'];
+      const lines = [head, ...rows.map((r, i) => [i + 1, r.m.studentId || '', r.m.name, r.m.classroom || '', r.m.position || '', r.done, Math.round(r.p.hours * 10) / 10, r.p.present, r.p.late, r.p.leave, r.p.absent, r.rate ?? ''])];
+      const csv = '\ufeff' + lines.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = `ยอดปฏิบัติงาน-${ds.totYear ? 'ปีการศึกษา' + ds.totYear : 'ทั้งหมด'}-${today()}.csv`;
+      a.click(); URL.revokeObjectURL(a.href);
+    };
+  }
+
+  function memberTotals(r) {
+    if (!r) return;
+    const list = [...r.p.byDuty.entries()].map(([id, q]) => ({ d: dutyById(id), q })).filter(x => x.d)
+      .sort((a, b) => b.d.startDate.localeCompare(a.d.startDate));
+    const sub = [r.m.studentId && 'เลขที่ ' + r.m.studentId, r.m.classroom, r.m.position].filter(Boolean).map(esc).join(' · ');
+    openDialog(`${dlgHead(esc(r.m.name))}
+      <div class="dlg-body">
+        ${sub ? `<p class="hint">${sub}</p>` : ''}
+        <div class="tot-sum">
+          <div><b>${r.done}</b><small>ครั้งที่ปฏิบัติงาน</small></div>
+          <div><b>${fmtH(r.p.hours)}</b><small>ชั่วโมง</small></div>
+          <div><b>${r.rate == null ? '—' : r.rate + '%'}</b><small>อัตรามา</small></div>
+        </div>
+        ${list.length ? `<ul class="tot-duties">${list.map(({ d, q }) => `
+          <li><a href="#duty/${esc(d.id)}" data-close><b>${esc(d.title)}</b><small>${periodLabel(d)}</small></a>
+            <span class="tot-pills">${Object.entries(STATUS).filter(([k]) => q[k]).map(([k, v]) => `<span class="pill st-${k}">${v.label} ${q[k]}</span>`).join('')}${q.hours ? `<span class="pill">${fmtH(q.hours)} ชม.</span>` : ''}</span></li>`).join('')}</ul>`
+          : '<p class="empty">ยังไม่มีผลการเช็คชื่อในช่วงนี้</p>'}
+        <div class="dlg-actions"><button type="button" class="btn btn-ghost" data-close>ปิด</button></div>
+      </div>`);
   }
 
   /* ================= ฟอร์มสร้าง/แก้ไขงาน ================= */

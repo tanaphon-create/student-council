@@ -1188,3 +1188,19 @@ html.lb-on, html.lb-on body { overflow: hidden; }
   .lk-music { top: 12px; right: 12px; font-size: 14px; padding: 7px 13px; }
   .lk-title { top: 58px; }
 }
+
+/* ยอดปฏิบัติงานรวม */
+.totals td.medal { font-size: 18px; text-align: center; width: 44px; }
+.totals .tot-name { font: inherit; font-weight: 600; color: var(--green-800); text-align: left; padding: 0; }
+.totals tr.void td { opacity: .6; }
+#page-duty .toolbar select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fff; }
+.tot-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 6px 0 14px; }
+.tot-sum div { background: var(--green-50, #f1f7f2); border-radius: 12px; padding: 10px; text-align: center; }
+.tot-sum b { display: block; font: 600 24px 'Prompt'; color: var(--green-800); }
+.tot-sum small { color: var(--muted); }
+.tot-duties { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow: auto; }
+.tot-duties li { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tot-duties a { color: inherit; text-decoration: none; display: flex; flex-direction: column; }
+.tot-duties a small { color: var(--muted); }
+.tot-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.back-link + .stats { margin-top: 12px; }
